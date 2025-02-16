@@ -1,0 +1,142 @@
+{
+    "config": 
+    {
+        "adapter": [
+            "xhr",
+            "http",
+            "fetch"
+        ],
+        "baseURL": "https://24e7-2409-40e7-da-8dc8-d226-54c5-8ae9-17ae.ngrok-free.app",
+        "data": "{\"username\":\"banki\",\"password\":\"banki\"}",
+        "env": {
+            "Blob": [Function Blob
+            ],
+            "FormData": [Function FormData
+            ]
+        },
+        "headers": [Object
+        ],
+        "maxBodyLength": -1,
+        "maxContentLength": -1,
+        "method": "post",
+        "timeout": 0,
+        "transformRequest": [
+            [Function transformRequest
+            ]
+        ],
+        "transformResponse": [
+            [Function transformResponse
+            ]
+        ],
+        "transitional": {
+            "clarifyTimeoutError": false,
+            "forcedJSONParsing": true,
+            "silentJSONParsing": true
+        },
+        "url": "/chat/signin/",
+        "validateStatus": [Function validateStatus
+        ],
+        "xsrfCookieName": "XSRF-TOKEN",
+        "xsrfHeaderName": "X-XSRF-TOKEN"
+    },
+    "data": {
+        "tokens": {
+            "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTc2NTgzLCJpYXQiOjE3Mzc5NzYyODMsImp0aSI6ImY1ZTFlMjAxZmQ4MTRiNDU5NDQ4OGEwNGNjZjE5ODc0IiwidXNlcl9pZCI6Mn0.8aUcyBcnNppFs5L2UExRu3Trzeo7AzOhRIfX4ANxvJY",
+            "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczODA2MjY4MywiaWF0IjoxNzM3OTc2MjgzLCJqdGkiOiJjNzNlNDBmNDgxODM0ZmY5YjdhMzc3NDMyYTY2MzAxNCIsInVzZXJfaWQiOjJ9._TytY6GX3obHiTFRfFRvRcgY7Kn6clKTQOp6lYwAFH0"
+        },
+        "user": {
+            "followers": [Array
+            ],
+            "following": [Array
+            ],
+            "name": "Bankithung Kikon",
+            "thumbnail": "/media/thumbnails/banki_j0OKppB.jpg",
+            "user_Bg_thumbnail": "/media/background_thumbnails/IMG-20241211-WA0001.jpg",
+            "username": "banki"
+        }
+    },
+
+    "headers": {
+        "allow": "POST, OPTIONS",
+        "content-length": "703",
+        "content-type": "application/json",
+        "cross-origin-opener-policy": "same-origin",
+        "date": "Mon, 27 Jan 2025 11:11:23 GMT",
+        "ngrok-agent-ips": "2405:201:ac00:d2c2:a73f:7652:5414:32d2",
+        "referrer-policy": "same-origin",
+        "server": "daphne",
+        "vary": "Accept, origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY"
+    },
+    "request": {
+        "DONE": 4,
+        "HEADERS_RECEIVED": 2,
+        "LOADING": 3,
+        "OPENED": 1,
+        "UNSENT": 0,
+        "_aborted": false,
+        "_cachedResponse": undefined,
+        "_hasError": false,
+        "_headers": {
+            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json"
+        },
+        "_incrementalEvents": false,
+        "_lowerCaseResponseHeaders": {
+            "allow": "POST, OPTIONS",
+            "content-length": "703",
+            "content-type": "application/json",
+            "cross-origin-opener-policy": "same-origin",
+            "date": "Mon, 27 Jan 2025 11:11:23 GMT",
+            "ngrok-agent-ips": "2405:201:ac00:d2c2:a73f:7652:5414:32d2",
+            "referrer-policy": "same-origin",
+            "server": "daphne",
+            "vary": "Accept, origin",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY"
+        },
+        "_method": "POST",
+        "_perfKey": "network_XMLHttpRequest_https://24e7-2409-40e7-da-8dc8-d226-54c5-8ae9-17ae.ngrok-free.app/chat/signin/",
+        "_performanceLogger": {
+            "_closed": false,
+            "_extras": [Object
+            ],
+            "_pointExtras": [Object
+            ],
+            "_points": [Object
+            ],
+            "_timespans": [Object
+            ]
+        },
+        "_requestId": null,
+        "_response": "{\"user\":{\"username\":\"banki\",\"name\":\"Bankithung Kikon\",\"thumbnail\":\"/media/thumbnails/banki_j0OKppB.jpg\",\"user_Bg_thumbnail\":\"/media/background_thumbnails/IMG-20241211-WA0001.jpg\",\"following\":[],\"followers\":[]},\"tokens\":{\"access\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTc2NTgzLCJpYXQiOjE3Mzc5NzYyODMsImp0aSI6ImY1ZTFlMjAxZmQ4MTRiNDU5NDQ4OGEwNGNjZjE5ODc0IiwidXNlcl9pZCI6Mn0.8aUcyBcnNppFs5L2UExRu3Trzeo7AzOhRIfX4ANxvJY\",\"refresh\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczODA2MjY4MywiaWF0IjoxNzM3OTc2MjgzLCJqdGkiOiJjNzNlNDBmNDgxODM0ZmY5YjdhMzc3NDMyYTY2MzAxNCIsInVzZXJfaWQiOjJ9._TytY6GX3obHiTFRfFRvRcgY7Kn6clKTQOp6lYwAFH0\"}}",
+        "_responseType": "",
+        "_sent": true,
+        "_subscriptions": [],
+        "_timedOut": false,
+        "_trackingName": "unknown",
+        "_url": "https://24e7-2409-40e7-da-8dc8-d226-54c5-8ae9-17ae.ngrok-free.app/chat/signin/",
+        "readyState": 4,
+        "responseHeaders": {
+            "allow": "POST, OPTIONS",
+            "content-length": "703",
+            "content-type": "application/json",
+            "cross-origin-opener-policy": "same-origin",
+            "date": "Mon, 27 Jan 2025 11:11:23 GMT",
+            "ngrok-agent-ips": "2405:201:ac00:d2c2:a73f:7652:5414:32d2",
+            "referrer-policy": "same-origin",
+            "server": "daphne",
+            "vary": "Accept, origin",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY"
+        },
+        "responseURL": "https://24e7-2409-40e7-da-8dc8-d226-54c5-8ae9-17ae.ngrok-free.app/chat/signin/",
+        "status": 200,
+        "timeout": 0,
+        "upload": {},
+        "withCredentials": true
+    },
+    "status": 200,
+    "statusText": undefined
+}
