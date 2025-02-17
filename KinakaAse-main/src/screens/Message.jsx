@@ -33,6 +33,7 @@ import utils from '../core/utils';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {FlashList} from '@shopify/flash-list';
 import Toast from 'react-native-simple-toast';
+import {Menu, Divider} from 'react-native-paper';
 
 import Geolocation from '@react-native-community/geolocation';
 import {WebView} from 'react-native-webview';
@@ -81,53 +82,85 @@ import ImageResizer from 'react-native-image-resizer';
 const audioRecorderPlayer = new AudioRecorderPlayer();
 audioRecorderPlayer.setSubscriptionDuration(0.1);
 
-function MessageHeader({friend, navigation, connectionId,user}) {
+function MessageHeader({friend, navigation, connectionId, user}) {
   const messageSend = useGlobal(state => state.messageSend);
+  const [visible, setVisible] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          damping: 20,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => scaleAnim.setValue(0));
+    }
+  }, [visible]);
+
   if (!friend) return null;
+
   const handleProfile = () => {
-    navigation.navigate('OtherProfile', (friend = {friend}));
+    navigation.navigate('OtherProfile', { friend });
   };
 
-  console.log("USER FROM Header",user)
-
   const generateID = () => {
-    var result = '';
-    var characters =
+    let result = '';
+    const characters =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for (var i = 0; i < 6; i++) {
+    const charactersLength = characters.length;
+    for (let i = 0; i < 6; i++) {
       result += characters.charAt(Math.floor(Math.random() * charactersLength));
     }
     return result;
   };
 
-  function openCameras() {
+  const openCameras = () => {
     const id = generateID();
     messageSend(connectionId, id, 'videocall');
-    navigation.navigate('VideoCall', {roomId: id, friend, navigation});
-  }
+    navigation.navigate('VideoCall', { roomId: id, friend, navigation });
+  };
 
-  function openPlayer() {
+  const openPlayer = ({ roomType }) => {
     const id = generateID();
-    messageSend(connectionId, id, 'listen');
-    const tuser=user.username
-    navigation.navigate('PlayMusic', {roomId: id, navigation,host:tuser});
-  }
+    const val=roomType==="PlayMusic"?'listen':"watch";
+    console.log(val)
+    messageSend(connectionId, id, val);
+    const tuser = user.username;
+    navigation.navigate(roomType, { roomId: id, navigation, host: tuser });
+  };
+
+  const openMenu = () => setVisible(true);
+  const closeMenu = () => setVisible(false);
 
   return (
     <View
       style={{
         flex: 1,
         flexDirection: 'row',
-        alignItems: 'left',
+        alignItems: 'center',
         height: 60,
         paddingVertical: 10,
         marginLeft: -32,
-        backgroundColor: '#0f0607',
       }}>
-      <Thumbnail url={friend?.thumbnail} size={35} />
-      <TouchableOpacity onPress={handleProfile}>
-        <View style={{flex: 1}}>
+      {/* Container for Thumbnail and Name */}
+      <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
+        <Thumbnail url={friend?.thumbnail} size={35} />
+        <TouchableOpacity onPress={handleProfile}>
           <Text
             style={{
               color: 'white',
@@ -139,24 +172,22 @@ function MessageHeader({friend, navigation, connectionId,user}) {
             }}>
             {friend.name}
           </Text>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
 
+      {/* Icons for Video, Phone, and Dropdown Menu */}
       <View
         style={{
-          flex: 1,
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          width: 20,
+          justifyContent: 'flex-start',
           flexDirection: 'row',
+          left:10
+          
         }}>
-        <TouchableOpacity
-          onPress={() => {
-            openCameras();
-          }}>
+        <TouchableOpacity onPress={openCameras}>
           <FontAwesomeIcon
-            style={{marginRight: 20}}
-            icon="fa-solid fa-video"
+            style={{ marginRight: 30 }}
+            icon="video"
             size={17}
             color="white"
           />
@@ -164,27 +195,60 @@ function MessageHeader({friend, navigation, connectionId,user}) {
 
         <TouchableOpacity>
           <FontAwesomeIcon
-            style={{marginRight: 17}}
-            icon="fa-solid fa-phone-volume"
+            style={{ marginRight: 15 }}
+            icon="phone"
             size={17}
             color="white"
           />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => {
-            openPlayer()
-          }}>
-          <FontAwesomeIcon
-            icon="fa-solid fa-ellipsis-vertical"
-            size={22}
-            color="white"
-          />
-        </TouchableOpacity>
+        <Menu
+          visible={visible}
+          onDismiss={closeMenu}
+          anchor={
+            <TouchableOpacity
+              onPress={openMenu}
+              style={{  paddingVertical: 5 }}>
+              <FontAwesomeIcon icon="ellipsis-v" size={22} color="white" />
+            </TouchableOpacity>
+          }
+          contentStyle={[
+            {
+              transform: [{ scale: scaleAnim }],
+              opacity: opacityAnim,
+              marginTop: 10,
+              backgroundColor: '#2a1a1c',
+              borderRadius: 8,
+            },
+          ]}
+          style={{ marginTop: 30 }}>
+          <Animated.View>
+            <Menu.Item
+              onPress={() => {
+                closeMenu();
+                openPlayer({ roomType: 'PlayMusic' });
+              }}
+              title="Listen Together"
+              titleStyle={{ color: 'white' }}
+              style={{ backgroundColor: '#2a1a1c' }}
+            />
+            <Divider style={{ backgroundColor: '#413033' }} />
+            <Menu.Item
+              onPress={() => {
+                closeMenu();
+                openPlayer({ roomType: 'PlayVideo' });
+              }}
+              title="Watch Together"
+              titleStyle={{ color: 'white' }}
+              style={{ backgroundColor: '#2a1a1c' }}
+            />
+          </Animated.View>
+        </Menu>
       </View>
     </View>
   );
 }
+
 
 function MessageBubbleMe({
   text,
@@ -259,8 +323,12 @@ function MessageBubbleMe({
   }
 
   function openPlayer() {
-    
-    navigation.navigate('PlayMusic', {roomId: text.text, navigation,host:user.username});
+    const type=text.type==="watch"?"PlayVideo":'PlayMusic'
+    navigation.navigate(type, {
+      roomId: text.text,
+      navigation,
+      host: user.username,
+    });
   }
 
   return (
@@ -537,7 +605,7 @@ function MessageBubbleMe({
                       </TouchableOpacity>
                     </View>
                   </View>
-                ): text.type === 'listen' ? (
+                ) : text.type === 'listen' || text.type==="watch" ? (
                   <View>
                     {/* <Text>Outgoing Video Call</Text> listenTogether*/}
                     <View
@@ -554,11 +622,11 @@ function MessageBubbleMe({
                         onPress={() => {
                           openPlayer();
                         }}>
-                        <Text>Listen</Text>
+                        <Text>{ text.type === 'listen'?"Listen":"Watch"}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                )  : null}
+                ) : null}
               </View>
             )}
 
@@ -734,8 +802,12 @@ function MessageBubbleFriend({
   }
 
   function openPlayer() {
-    
-    navigation.navigate('PlayMusic', {roomId: text.text, navigation,host:user.username});
+    const type=text.type==="watch"?"PlayVideo":'PlayMusic'
+    navigation.navigate(type, {
+      roomId: text.text,
+      navigation,
+      host: user.username,
+    });
   }
 
   return (
@@ -1004,11 +1076,10 @@ function MessageBubbleFriend({
                 </TouchableOpacity>
               </View>
             </View>
-          ) : text.type === 'listen' ? (
+          ) : text.type === 'listen'|| text.type === 'watch' ? (
             <View>
               {/* <Text>Outgoing Video Call</Text> listenTogether*/}
-              <View
-                style={{flexDirection: 'row', justifyContent: 'center'}}>
+              <View style={{flexDirection: 'row', justifyContent: 'center'}}>
                 <TouchableOpacity
                   style={{
                     backgroundColor: 'rgba(182, 79, 53, 0.58)',
@@ -1021,11 +1092,11 @@ function MessageBubbleFriend({
                   onPress={() => {
                     openPlayer();
                   }}>
-                  <Text>Listen</Text>
+                  <Text>{text.type === 'listen'?"Listen":"Watch"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          )  : null}
+          ) : null}
 
           {typing ? null : (
             <Text

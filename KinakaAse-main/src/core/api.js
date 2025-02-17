@@ -5,7 +5,7 @@ import { Alert, Platform } from 'react-native'
 
 export const ADDRESS = Platform.OS === 'ios'
  	? 'localhost:8000'
-	: "a492-103-55-63-46.ngrok-free.app"
+	: "bee5-103-55-63-46.ngrok-free.app"
 
 const api = axios.create({
 	

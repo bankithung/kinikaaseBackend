@@ -62,14 +62,14 @@ function FriendsScreen({ navigation }) {
   }
 
   // Show empty state
-  if (filteredList.length === 0) {
-    return (
-      <Empty 
-        icon='message' 
-        message={searchQuery ? 'No matches found' : 'No messages yet'} 
-      />
-    )
-  }
+  // if (filteredList.length === 0) {
+  //   return (
+  //     <Empty 
+  //       icon='message' 
+  //       message={searchQuery ? 'No matches found' : 'No messages yet'} 
+  //     />
+  //   )
+  // }
 
   return (
     <View style={{ flex: 1 }}>

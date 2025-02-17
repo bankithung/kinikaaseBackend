@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect, useCallback, memo} from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import Video from 'react-native-video';
 import {
   faHeart,
@@ -25,8 +25,9 @@ import {
   faTimes,
   faPlay,
 } from '@fortawesome/free-solid-svg-icons';
+import { useIsFocused } from '@react-navigation/native'; // Add this import
 
-const {height: SCREEN_HEIGHT, width: SCREEN_WIDTH} = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_BAR_HEIGHT = 110;
 const STATUS_BAR_HEIGHT = 100;
 const VIDEO_HEIGHT = SCREEN_HEIGHT - TAB_BAR_HEIGHT;
@@ -164,6 +165,7 @@ const ReelItem = memo(({item, isActive, onLike, onShare, onFollow}) => {
   const videoRef = useRef(null);
   const [isBuffering, setIsBuffering] = useState(false);
 
+
   const handleLike = useCallback(() => {
     onLike(item.id, !item.isLiked);
   }, [item.id, item.isLiked, onLike]);
@@ -185,6 +187,7 @@ const ReelItem = memo(({item, isActive, onLike, onShare, onFollow}) => {
       return !prev;
     });
   }, []);
+
   const handleShare = useCallback(async () => {
     try {
       await Share.share({
@@ -200,11 +203,11 @@ const ReelItem = memo(({item, isActive, onLike, onShare, onFollow}) => {
     <View style={styles.videoContainer}>
       <Video
         ref={videoRef}
-        source={{uri: item.video}}
+        source={{ uri: item.video }}
         style={styles.video}
         resizeMode="cover"
         repeat
-        paused={!isActive}
+        paused={!isActive} // Pause if not active
         playInBackground={false}
         playWhenInactive={false}
         ignoreSilentSwitch="obey"
@@ -320,10 +323,10 @@ const StatusView = ({statuses, initialIndex, onClose}) => {
   const videoRefs = useRef(new Map());
 
   useEffect(() => {
-    flatListRef.current?.scrollToIndex({index: initialIndex, animated: false});
+    flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
   }, [initialIndex]);
 
-  const onViewableItemsChanged = useRef(({viewableItems}) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
       const index = viewableItems[0].index;
       setCurrentIndex(index);
@@ -338,15 +341,15 @@ const StatusView = ({statuses, initialIndex, onClose}) => {
     minimumViewTime: 300,
   }).current;
 
-  const renderItem = ({item, index}) => (
+  const renderItem = ({ item, index }) => (
     <View style={styles.fullScreenVideo}>
       <Video
         ref={ref => videoRefs.current.set(index, ref)}
-        source={{uri: item.video}}
+        source={{ uri: item.video }}
         style={styles.statusVideo}
         resizeMode="contain"
         repeat
-        paused={index !== currentIndex}
+        paused={index !== currentIndex} // Pause if not active
         onError={e => console.log('Status video error:', e.error)}
       />
       <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -378,12 +381,14 @@ const StatusView = ({statuses, initialIndex, onClose}) => {
     </Modal>
   );
 };
+
 const ReelScreen = () => {
   const [reels, setReels] = useState(reelData);
   const [statuses, setStatuses] = useState(statusData);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const currentIndex = useRef(0);
   const flatListRef = useRef(null);
+  const isFocused = useIsFocused(); // Track screen focus
 
   const handleLike = useCallback((reelId, isLiked) => {
     setReels(prev =>
@@ -426,73 +431,79 @@ const ReelScreen = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isFocused) {
+      flatListRef.current?.scrollToIndex({ index: currentIndex.current, animated: false });
+    }
+  }, [isFocused]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.statusBarContainer}>
-        <FlatList
-          horizontal
-          data={statuses}
-          contentContainerStyle={styles.statusList}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({item, index}) => (
-            <TouchableOpacity
-              style={styles.statusItem}
-              onPress={() => handleStatusPress(index)}>
-              <View
-                style={[
-                  styles.statusRing,
-                  !item.isViewed && styles.unviewedStatus,
-                ]}>
-                <Image
-                  source={{uri: item.profilePic}}
-                  style={styles.statusImage}
-                />
-              </View>
-              <Text style={styles.statusUsername}>{item.user}</Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-      <View style={{backgroundColor: 'black', flex: 1}}>
-        <FlatList
-          ref={flatListRef}
-          data={reels}
-          keyExtractor={item => item.id.toString()}
-          renderItem={({item, index}) => (
-            <ReelItem
-              item={item}
-              isActive={index === currentIndex.current}
-              onLike={handleLike}
-              onShare={handleShare}
-              onFollow={handleFollow}
-            />
-          )}
-          pagingEnabled
-          showsVerticalScrollIndicator={false}
-          onViewableItemsChanged={onViewableItemsChanged.current}
-          viewabilityConfig={{
-            itemVisiblePercentThreshold: 90,
-            minimumViewTime: 300,
-          }}
-          snapToInterval={VIDEO_HEIGHT}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          contentContainerStyle={styles.flatListContent}
-          getItemLayout={(data, index) => ({
-            length: VIDEO_HEIGHT-(TAB_BAR_HEIGHT-45),
-            offset: VIDEO_HEIGHT-(TAB_BAR_HEIGHT-45) ,
-            index,
-          })}
-        />
-      </View>
-      {selectedStatus !== null && (
-        <StatusView
-          statuses={statuses}
-          initialIndex={selectedStatus}
-          onClose={() => setSelectedStatus(null)}
-        />
-      )}
-    </SafeAreaView>
+    <View style={styles.statusBarContainer}>
+      <FlatList
+        horizontal
+        data={statuses}
+        contentContainerStyle={styles.statusList}
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item, index }) => (
+          <TouchableOpacity
+            style={styles.statusItem}
+            onPress={() => handleStatusPress(index)}>
+            <View
+              style={[
+                styles.statusRing,
+                !item.isViewed && styles.unviewedStatus,
+              ]}>
+              <Image
+                source={{ uri: item.profilePic }}
+                style={styles.statusImage}
+              />
+            </View>
+            <Text style={styles.statusUsername}>{item.user}</Text>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+    <View style={{ backgroundColor: 'black', flex: 1 }}>
+      <FlatList
+        ref={flatListRef}
+        data={reels}
+        keyExtractor={item => item.id.toString()}
+        renderItem={({ item, index }) => (
+          <ReelItem
+            item={item}
+            isActive={index === currentIndex.current && isFocused} // Only active if screen is focused
+            onLike={handleLike}
+            onShare={handleShare}
+            onFollow={handleFollow}
+          />
+        )}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        viewabilityConfig={{
+          itemVisiblePercentThreshold: 90,
+          minimumViewTime: 300,
+        }}
+        snapToInterval={VIDEO_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        contentContainerStyle={styles.flatListContent}
+        getItemLayout={(data, index) => ({
+          length: VIDEO_HEIGHT - (TAB_BAR_HEIGHT - 45),
+          offset: VIDEO_HEIGHT - (TAB_BAR_HEIGHT - 45),
+          index,
+        })}
+      />
+    </View>
+    {selectedStatus !== null && (
+      <StatusView
+        statuses={statuses}
+        initialIndex={selectedStatus}
+        onClose={() => setSelectedStatus(null)}
+      />
+    )}
+  </SafeAreaView>
   );
 };
 

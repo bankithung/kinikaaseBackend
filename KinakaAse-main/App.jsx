@@ -25,7 +25,8 @@ import VideoCallScreen from './src/screens/Index'
 import ImageViewerComponent from './src/screens/ImageViewer/ImageViewer'
 import MusicSyncScreen from './src/screens/Together/Listen'
 import ViewAnyImage from './src/screens/ImageViewer/ViewAnyImage'
-
+import VideoSyncScreen from './src/screens/Together/video'
+import { Provider as PaperProvider } from 'react-native-paper';
 
 const LightTheme = {
 	...DefaultTheme,
@@ -50,6 +51,7 @@ function App() {
 	}, [])
 
 	return (
+		<PaperProvider>
 		<GestureHandlerRootView style={{ flex: 1 }}>
 		<NavigationContainer theme={LightTheme}>
 			<StatusBar barStyle='light-content' backgroundColor={"#0f0607"} />
@@ -76,12 +78,14 @@ function App() {
 						<Stack.Screen name="viewImage" component={ImageViewerComponent}   options={{headerShown:false}}/>
 						<Stack.Screen name="PlayMusic" component={MusicSyncScreen}   options={{headerShown:false}}/>
 						<Stack.Screen name="ViewAnyImage" component={ViewAnyImage}   options={{headerShown:false}}/>
+						<Stack.Screen name="PlayVideo" component={VideoSyncScreen}   options={{headerShown:false}}/>
 
 					</>
 				)}
 			</Stack.Navigator>
 		</NavigationContainer>
 		</GestureHandlerRootView>
+		</PaperProvider>
 	)
 }
 

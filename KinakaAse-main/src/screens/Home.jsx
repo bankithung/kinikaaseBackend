@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {
   SafeAreaView,
   Text,
@@ -6,10 +6,12 @@ import {
   View,
   Image,
   StyleSheet,
+  Animated,
+  Easing,
 } from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import { faClapperboard } from '@fortawesome/free-solid-svg-icons';
+import {faClapperboard} from '@fortawesome/free-solid-svg-icons';
 
 import RequestsScreen from './Requests';
 import FriendsScreen from './Friends';
@@ -18,6 +20,9 @@ import useGlobal from '../core/global';
 import Thumbnail from '../common/Thumbnail';
 import ReelScreen from './Reels';
 import MyProfile from './myprofile';
+import KariScreen from './kari';
+import DoctoAi from './Docto/Docto';
+import {Divider, Menu} from 'react-native-paper';
 
 const Tab = createBottomTabNavigator();
 
@@ -25,17 +30,34 @@ function HomeScreen({navigation}) {
   const socketConnect = useGlobal(state => state.socketConnect);
   const socketClose = useGlobal(state => state.socketClose);
   const user = useGlobal(state => state.user);
-
-  // const [server,setServer]=useState(undefined)
-  // const getServer=async()=>{
-
-  // 		const url='https://api.jsonsilo.com/public/7bb0c65a-5d74-4ab4-9fa1-7459c0be916d'
-
-  // 		const res=await fetch(url)
-  // 		setServer(await res.json());
-
-  // 		console.log("mhbmhb=>",server)
-  // 	}
+  const [visible, setVisible] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const openMenu = () => setVisible(true);
+  const closeMenu = () => setVisible(false);
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          damping: 20,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start(() => scaleAnim.setValue(0));
+    }
+  }, [visible]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -44,8 +66,6 @@ function HomeScreen({navigation}) {
   }, []);
 
   useEffect(() => {
-    // getServer()
-
     socketConnect();
     return () => {
       socketClose();
@@ -61,15 +81,8 @@ function HomeScreen({navigation}) {
 
   return (
     <Tab.Navigator
-      o
       screenOptions={({route, navigation}) => ({
         tabBarHideOnKeyboard: true,
-
-        // headerLeft: () => (
-        // 	<View style={{ marginLeft: 16 }}>
-        // 		<Text style={style.kinakaseText}>KinakaAse</Text>
-        // 	</View>
-        // ),
         headerRight: () => (
           <View style={{justifyContent: 'space-evenly', flexDirection: 'row'}}>
             <TouchableOpacity onPress={onRequest}>
@@ -80,8 +93,6 @@ function HomeScreen({navigation}) {
                 color="white"
               />
             </TouchableOpacity>
-
-
             <TouchableOpacity onPress={onSearch}>
               <FontAwesomeIcon
                 style={{marginRight: 16}}
@@ -90,6 +101,79 @@ function HomeScreen({navigation}) {
                 color="white"
               />
             </TouchableOpacity>
+
+            <Menu
+              visible={visible}
+              onDismiss={closeMenu}
+              anchor={
+                <TouchableOpacity
+                  onPress={openMenu}
+                  style={{paddingVertical: 0}}>
+                  <FontAwesomeIcon icon="ellipsis-v" size={22} color="white" />
+                </TouchableOpacity>
+              }
+              contentStyle={[
+                {
+                  transform: [{scale: scaleAnim}],
+                  opacity: opacityAnim,
+                  marginTop: -10,
+                  backgroundColor: '#2a1a1c',
+                  borderRadius: 8,
+                },
+              ]}
+              style={{marginTop: 40}}>
+              <Animated.View>
+                <Menu.Item
+                  onPress={() => {
+                    closeMenu();
+                    // openPlayer({roomType: 'PlayMusic'});
+                  }}
+                  title="Option One"
+                  titleStyle={{color: 'white'}}
+                  style={{backgroundColor: '#2a1a1c'}}
+                />
+                <Divider style={{backgroundColor: '#413033'}} />
+                <Menu.Item
+                  onPress={() => {
+                    closeMenu();
+                    // openPlayer({roomType: 'PlayVideo'});
+                  }}
+                  title="Option Two"
+                  titleStyle={{color: 'white'}}
+                  style={{backgroundColor: '#2a1a1c'}}
+                />
+                <Divider style={{backgroundColor: '#413033'}} />
+                <Menu.Item
+                  onPress={() => {
+                    closeMenu();
+                    // openPlayer({roomType: 'PlayVideo'});
+                  }}
+                  title="Option Three"
+                  titleStyle={{color: 'white'}}
+                  style={{backgroundColor: '#2a1a1c'}}
+                />
+<Divider style={{backgroundColor: '#413033'}} />
+                <Menu.Item
+                  onPress={() => {
+                    closeMenu();
+                    // openPlayer({roomType: 'PlayVideo'});
+                  }}
+                  title="Option Four"
+                  titleStyle={{color: 'white'}}
+                  style={{backgroundColor: '#2a1a1c'}}
+                />
+<Divider style={{backgroundColor: '#413033'}} />
+                <Menu.Item
+                  onPress={() => {
+                    closeMenu();
+                    // openPlayer({roomType: 'PlayVideo'});
+                  }}
+                  title="Option Five"
+                  titleStyle={{color: 'white'}}
+                  style={{backgroundColor: '#2a1a1c'}}
+                />
+              </Animated.View>
+            </Menu>
           </View>
         ),
         tabBarIcon: ({focused, color, size}) => {
@@ -98,18 +182,22 @@ function HomeScreen({navigation}) {
             Chats: 'message',
             Profile: 'user',
             Reels: faClapperboard,
+            DocotAi: 'user-doctor',
           };
           const icon = icons[route.name];
           return <FontAwesomeIcon icon={icon} size={19} color="white" />;
         },
-        tabBarStyle: {
-          height: 65,
-          backgroundColor: '#0f0607',
-          borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-          marginTop: 10,
-        },
+        tabBarStyle:
+          route.name === 'DocotAi'
+            ? {display: 'none'}
+            : {
+                height: 65,
+                backgroundColor: '#0f0607',
+                borderTopWidth: 0,
+                elevation: 0,
+                shadowOpacity: 0,
+                marginTop: 10,
+              },
         tabBarActiveBackgroundColor: '#0f0607',
         tabBarInactiveBackgroundColor: '#0f0607',
         tabBarActiveTintColor: 'red',
@@ -135,7 +223,7 @@ function HomeScreen({navigation}) {
         }}
       />
 
-      {/* <Tab.Screen
+      <Tab.Screen
         name="Reels"
         component={ReelScreen}
         options={{
@@ -147,17 +235,44 @@ function HomeScreen({navigation}) {
           },
         }}
       />
+
+      <Tab.Screen
+        name="DocotAi"
+        component={DoctoAi}
+        options={({navigation}) => ({
+          headerShown: false,
+          headerTitle: 'Docto AI',
+          headerTitleStyle: {
+            color: 'white',
+            fontSize: 20,
+          },
+          headerStyle: {
+            backgroundColor: '#0f0607',
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Chats')}
+              style={{marginLeft: 16}}>
+              <FontAwesomeIcon icon="arrow-left" size={22} color="white" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+
       <Tab.Screen
         name="Kari"
-        component={RequestsScreen}
+        component={KariScreen}
         options={{
+          headerShown: false,
           headerStyle: {
             backgroundColor: '#0f0607',
             height: 80,
             elevation: 1,
           },
         }}
-      /> */}
+      />
 
       <Tab.Screen
         name="Profile"
@@ -174,6 +289,7 @@ function HomeScreen({navigation}) {
     </Tab.Navigator>
   );
 }
+
 const style = StyleSheet.create({
   kinakaseText: {
     fontSize: 25,
@@ -181,4 +297,5 @@ const style = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 export default HomeScreen;

@@ -1,3 +1,4 @@
+
 import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
@@ -11,6 +12,7 @@ import {
   ActivityIndicator,
   FlatList,
   NativeModules,
+  Dimensions,
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import {v4 as uuidv4} from 'uuid';
@@ -66,6 +68,15 @@ const MusicSyncScreen = ({route, navigation}) => {
   const dataChannelRef = useRef();
   const otherUser = useRef();
   const pendingCandidates = useRef([]);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const screenDimensions = useRef(Dimensions.get('window'));
+
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+    if (!isFullScreen) {
+      PipModule.enterPipMode();
+    }
+  };
 
   console.log('USER FROM AUDIO', host);
 
@@ -162,7 +173,7 @@ const MusicSyncScreen = ({route, navigation}) => {
     }
   };
 
-  // Improved search functionality <FontAwesomeIcon icon="fa-solid fa-headphones" />
+  // Improved search functionality
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
@@ -322,10 +333,10 @@ const MusicSyncScreen = ({route, navigation}) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header <FontAwesomeIcon icon="fa-solid fa-film" />*/}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setShowPlaylistModal(true)}>
-          <FontAwesomeIcon icon="fa-solid fa-headphones" size={20} color="white" />
+          <FontAwesomeIcon icon="fa-solid fa-film" size={20} color="white" />
         </TouchableOpacity>
 
         <Text style={styles.roomId}>Room: {roomId}</Text>
@@ -356,29 +367,61 @@ const MusicSyncScreen = ({route, navigation}) => {
           {/* <TouchableOpacity onPress={togglePipMode} style={styles.pipButton}>
             <FontAwesomeIcon icon="window-restore" size={20} color="white" />
           </TouchableOpacity> */}
+
+          {/* <TouchableOpacity
+            onPress={toggleFullScreen}
+            style={styles.iconButton}>
+            <FontAwesomeIcon
+              icon={isFullScreen ? 'compress' : 'expand'}
+              size={25}
+              color="white"
+            />
+          </TouchableOpacity> */}
         </View>
       </View>
-
-      {/* Album Art */}
-      {playlist[currentTrackIndex]?.thumbnail ? (
-        <Image
-          source={{uri: playlist[currentTrackIndex].thumbnail}}
-          style={styles.albumArt}
-          resizeMode="cover"
+        <View style={styles.video}>
+           {/* Album Art */}
+      {playlist[currentTrackIndex]?.videoId ? (
+        <YoutubePlayer
+          ref={playerRef}
+          height={isFullScreen ? screenDimensions.current.height - 100 : 300}
+          width={isFullScreen ? screenDimensions.current.width : 300}
+          play={isPlaying}
+          volume={100}
+          videoId={playlist[currentTrackIndex].videoId}
+          initialPlayerParams={{
+            controls: 1, // Show native controls
+            preventFullScreen: false, // Allow YouTube's fullscreen
+            modestbranding: 1,
+            iv_load_policy: 3,
+          }}
+          webViewProps={{
+            allowsFullscreenVideo: true, // Enable iOS fullscreen
+            allowsInlineMediaPlayback: true,
+            mediaPlaybackRequiresUserAction: false,
+          }}
+          style={[
+            styles.videoPlayer,
+            isFullScreen && styles.fullScreenPlayer,
+          ]}
         />
       ) : (
         <View style={styles.albumArtPlaceholder}>
-          <FontAwesomeIcon icon="music" size={60} color="#666" />
+          <FontAwesomeIcon icon="fa-solid fa-play" size={60} color="#666" />
         </View>
       )}
+        </View>
+     
+
+
 
       {/* Track Info */}
       <View style={styles.trackInfo}>
         <Text style={styles.trackTitle} numberOfLines={1}>
-          {playlist[currentTrackIndex]?.title || 'No track selected'}
+          {playlist[currentTrackIndex]?.title || 'No Video selected'}
         </Text>
         <Text style={styles.trackArtist}>
-          {playlist[currentTrackIndex]?.artist || 'Search for tracks to add'}
+          {playlist[currentTrackIndex]?.artist || 'Search for Video to add'}
         </Text>
       </View>
 
@@ -563,7 +606,7 @@ const MusicSyncScreen = ({route, navigation}) => {
           onDuration={d => setDuration(d)}
         />
       )}
-      <Text style={{fontSize: 24, color: 'white'}}>{host}</Text>
+      <Text style={{fontSize: 20, color: 'white'}}>Host :  {host}</Text>
     </View>
   );
 };
@@ -995,6 +1038,31 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: '#1DB954',
   },
+  videoPlayer: {
+    alignSelf: 'center',
+    alignItems:'center',
+    borderRadius: 10,
+    overflow: 'hidden', // For rounded corners
+    justifyContent:'center'
+  },
+
+  // Update albumArtPlaceholder if needed
+  albumArtPlaceholder: {
+    width: 300,
+    height: 300,
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginBottom: 30,
+    backgroundColor: '#111',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  video:{
+    alignItems:'center',
+    justifyContent:'center',
+
+    flex:1
+  }
 });
 
 export default MusicSyncScreen;
