@@ -86,6 +86,7 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'creator', 'members', 'admins', 'created']
 
 class ReactionSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(slug_field='username', read_only=True)
     class Meta:
         model = Reaction
         fields = ['id', 'message', 'user', 'emoji', 'created']

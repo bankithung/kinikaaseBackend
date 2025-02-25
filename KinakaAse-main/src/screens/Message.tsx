@@ -77,6 +77,8 @@ const ASSETS = {
   documentIcon: require('../assets/document.png'),
   download: require('../assets/downloads.png'),
   video: require('../assets/video.png'),
+  edit: require('../assets/edit.png'),
+  react: require('../assets/react.png'),
 };
 
 const audioRecorderPlayer = new AudioRecorderPlayer();
@@ -732,18 +734,18 @@ const MessageBubbleMe = memo(
                 <Image source={ASSETS.reply} style={styles.optionIconMe} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => startEditing(text)}>
-                <Text style={styles.optionText}>Edit</Text>
+              <Image source={ASSETS.edit} style={styles.optionIconMe} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowEmojiPicker(true)}>
-                <Text style={styles.optionText}>React</Text>
+              <Image source={ASSETS.react} style={styles.optionIconMe} />
               </TouchableOpacity>
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 onPress={() => {
                   onPinMessage(text.id);
                   setSelectedMessageId(null);
                 }}>
                 <Image source={ASSETS.pin} style={styles.optionIconMe} />
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           )}
         </View>
@@ -1220,15 +1222,15 @@ const MessageBubbleFriend = memo(
                   />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowEmojiPicker(true)}>
-                  <Text style={styles.optionText}>React</Text>
+                <Image source={ASSETS.react} style={styles.optionIconFriend} />
                 </TouchableOpacity>
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   onPress={() => {
                     onPinMessage(text.id);
                     setSelectedMessageId(null);
                   }}>
                   <Image source={ASSETS.pin} style={styles.optionIconFriend} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             )}
           </View>

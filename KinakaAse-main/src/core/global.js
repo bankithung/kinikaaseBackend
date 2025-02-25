@@ -186,7 +186,11 @@ async function responseMessageSend(set, get, data) {
   await saveStoredMessages(connectionId, updatedMessages);
 
   const user = get().user;
-  const isSender = user.username === newMessage.user;
+  
+  const isSender = newMessage.is_me;
+
+
+  console.log("New message: ", isSender);
 
   const messageId = newMessage.id;
   const processedMessages = get().processedMessages || new Set();
