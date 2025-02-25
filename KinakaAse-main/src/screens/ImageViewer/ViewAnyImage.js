@@ -1,6 +1,6 @@
 
 
-import {View, TouchableOpacity, Text, StyleSheet, Image} from 'react-native';
+import {View, TouchableOpacity, Text, StyleSheet, Image, Alert} from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import useGlobal from '../../core/global';
 import {useState} from 'react';
@@ -15,12 +15,12 @@ const uploadNew = '../../assets/newProfile.png';
 
 
 const ViewAnyImage = ({route, navigation}) => {
-  const {image} = route.params;
-  const [selectedImage, setSelectedImage] = useState(image);
+  const {type} = route.params;
+  const [selectedImage, setSelectedImage] = useState(type);
     
 
   //utils.log(selectedImage);
-
+  // Alert.alert("type",type)
 
   return (
     <View style={styles.container}>
@@ -41,7 +41,7 @@ const ViewAnyImage = ({route, navigation}) => {
 
       {/* <Image source={{ uri: image.uri  }} style={styles.image} /> */}
       <ImageViewer
-        imageUrls={[{url: selectedImage?.uri}]}
+        imageUrls={[{url: type}]}
         enableSwipeDown
         swipeDownThreshold={50}
         style={styles.image}

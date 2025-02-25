@@ -12,11 +12,11 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-print('dir---->',BASE_DIR)
-
+# print('dir---->', BASE_DIR)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -29,41 +29,61 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-
 AUTH_USER_MODEL = 'chat.User'
+
+# Set GOOGLE_APPLICATION_CREDENTIALS to the service-account.json file in the same folder
+BASE_DIRT = Path(__file__).resolve().parent
+GOOGLE_APPLICATION_CREDENTIALS = os.path.join(BASE_DIRT, 'service-account.json')
+
+# print(GOOGLE_APPLICATION_CREDENTIALS)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}
+
+# SIMPLE JWT configuration:
+# The access token lifetime is set extremely long (10 years) so that it effectively
+# only "expires" when the user logs out and the token is blacklisted.
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=3650),  # 10 years lifetime for demonstration
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),     # typical refresh token lifetime
+    'ROTATE_REFRESH_TOKENS': True,                    # automatically rotate refresh tokens
+    'BLACKLIST_AFTER_ROTATION': True,                 # blacklist old refresh tokens on rotation
+    'UPDATE_LAST_LOGIN': False,
 }
 
 # Thumbnail uploads
 MEDIA_URL = '/media/'
-
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
 
 # Daphne
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Channels
+# Channels configuration
 CHANNEL_LAYERS = {
-	'default': {
-		'BACKEND': 'channels_redis.core.RedisChannelLayer',
-		'CONFIG': {
-			'hosts': [('127.0.0.1', 6379)]
-		}
-	}
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)]
+        }
+    }
 }
 
-
 # Application definition
-
 INSTALLED_APPS = [
-	'daphne',
-	'rest_framework',
-	'rest_framework_simplejwt',
+    'daphne',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # Required for token blacklisting on logout
     'channels',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -72,18 +92,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-	'chat'
+    'chat',
+    'rides',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Place CORS middleware high in the list
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -107,26 +129,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 CORS_ALLOW_ALL_ORIGINS = True 
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+# Database configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': "bujulo-v2", #env('DB_NAME'),
-        'USER': "admin", #env('DB_USER'),
-        'PASSWORD': "nimda", #env('DB_PASSWORD'),
-        'HOST': "localhost", #env('DB_HOST'),
-        'PORT': "5432", #env('DB_PORT'),
-        # 'ENGINE': 'django.db.backends.sqlite3',
-        # 'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': "bujulo-v2",  # Replace with your environment variable or production value
+        'USER': "admin",     # Replace with your environment variable or production value
+        'PASSWORD': "nimda", # Replace with your environment variable or production value
+        'HOST': "localhost", # Replace with your environment variable or production value
+        'PORT': "5432",      # Replace with your environment variable or production value
     }
 }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -142,25 +157,56 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
+# Internationalization settings
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
+# Static files settings
 STATIC_URL = 'static/'
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# MapMyIndia API credentials
+MAPMYINDIA_ACCESS_TOKEN = 'ce4ba26e-40bc-4439-a4e5-c47255994494'
+MAPMYINDIA_API_KEY = '738df5cda3bb66d54d345bed474c4313'
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'ridesharing.log'),
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'ridesharing': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False') == 'True'
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True

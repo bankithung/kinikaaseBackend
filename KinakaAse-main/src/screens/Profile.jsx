@@ -349,14 +349,14 @@ const styles = StyleSheet.create({
     // backgroundColor: '#1a1a1a',
   },
   name: {
-    color: 'white',
+    color: 'black',
     fontSize: 24,
     fontWeight: 'bold',
     marginVertical: 8,
     padding: 8,
   },
   username: {
-    color: 'white',
+    color: 'black',
     fontSize: 16,
     marginBottom: 20,
   },
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   infoValue: {
-    color: 'white',
+    color: 'black',
     fontSize: 16,
 	left:5
   },
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#333',
-    color: 'white',
+    color: 'black',
     borderRadius: 10,
     padding: 15,
     fontSize: 18,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   keyText: {
-    color: 'white',
+    color: 'black',
     fontSize: 16,
   },
   modalActions: {
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
   },
   editIconContainer: {
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: 'white'
+    borderColor: 'black'
   },
   uploadOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -465,6 +465,5 @@ const styles = StyleSheet.create({
   },
 });
 
-// ProfileLogout component remains the same as in original code
 
 export default ProfileScreen;

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome"
-import { View, Text, Image, TouchableOpacity, Modal, TextInput, StyleSheet, ActivityIndicator } from "react-native"
+import { View, Text, Image, TouchableOpacity, Modal, TextInput, StyleSheet, ActivityIndicator, Alert } from "react-native"
 import { launchImageLibrary } from 'react-native-image-picker'
 import ImageResizer from 'react-native-image-resizer';
 import useGlobal from "../core/global"
@@ -13,11 +13,11 @@ function ProfileImage({friend,navigation}) {
   console.log(utils.thumbnail(friend.thumbnail))
   const uri=utils.thumbnail(friend.thumbnail)
  
-
+  // Alert.alert("uri",uri.uri)
   return (
     <TouchableOpacity onPress={()=>{ 
       navigation.navigate('ViewAnyImage', {
-      image: uri,
+      type: uri.uri,
     })}}>
 
     <View style={styles.profile}>
@@ -100,14 +100,14 @@ const styles = StyleSheet.create({
     // backgroundColor: '#1a1a1a',
   },
   name: {
-    color: 'white',
+    color: 'black',
     fontSize: 24,
     fontWeight: 'bold',
     marginVertical: 8,
     padding: 8,
   },
   username: {
-    color: 'white',
+    color: 'black',
     fontSize: 16,
     marginBottom: 20,
   },
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   infoValue: {
-    color: 'white',
+    color: 'black',
     fontSize: 16,
 	left:2
   },

@@ -1,301 +1,349 @@
-import {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react';
 import {
   SafeAreaView,
   Text,
   TouchableOpacity,
   View,
-  Image,
   StyleSheet,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faClapperboard} from '@fortawesome/free-solid-svg-icons';
-
-import RequestsScreen from './Requests';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { 
+  faClapperboard, 
+  faBell, 
+  faMagnifyingGlass, 
+  faEllipsisV, 
+  faMessage, 
+  faUser, 
+  faCar, 
+  faUserDoctor, 
+  faArrowLeft 
+} from '@fortawesome/free-solid-svg-icons';
+// import RequestsScreen from './Requests';
 import FriendsScreen from './Friends';
 import ProfileScreen from './Profile';
 import useGlobal from '../core/global';
-import Thumbnail from '../common/Thumbnail';
-import ReelScreen from './Reels';
-import MyProfile from './myprofile';
-import KariScreen from './kari';
+import KariScreen from './kariScreen/KariScreen';
 import DoctoAi from './Docto/Docto';
-import {Divider, Menu} from 'react-native-paper';
+import UpdateScreen from './ReelsTemp';
+import NetInfo from '@react-native-community/netinfo';
+import { Divider, Menu } from 'react-native-paper';
+
+const ANIMATION_CONFIG = {
+  duration: Platform.OS === 'android' ? 150 : 200,
+  springDamping: 0.8,
+  initialScale: 0.95,
+};
 
 const Tab = createBottomTabNavigator();
 
-function HomeScreen({navigation}) {
-  const socketConnect = useGlobal(state => state.socketConnect);
-  const socketClose = useGlobal(state => state.socketClose);
-  const user = useGlobal(state => state.user);
-  const [visible, setVisible] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+const HeaderRight = memo(({ onRequest, onSearch, requestList, menuVisible, toggleMenu }) => (
+  <View style={styles.headerRight}>
+    <TouchableOpacity 
+      onPress={onRequest} 
+      style={styles.headerIcon}
+      activeOpacity={0.7}
+    >
+      <FontAwesomeIcon icon={faBell} size={22} color="black" />
+      {requestList?.length > 0 && (
+        <Animated.View style={styles.badge}>
+          <Text style={styles.badgeText}>{Math.min(requestList.length, 99)}</Text>
+        </Animated.View>
+      )}
+    </TouchableOpacity>
+    
+    <TouchableOpacity 
+      onPress={onSearch} 
+      style={styles.headerIcon}
+      activeOpacity={0.7}
+    >
+      <FontAwesomeIcon icon={faMagnifyingGlass} size={22} color="black" />
+    </TouchableOpacity>
+    
+    <Menu
+      visible={menuVisible}
+      onDismiss={toggleMenu}
+      anchor={
+        <TouchableOpacity 
+          onPress={toggleMenu} 
+          style={styles.headerIcon}
+          activeOpacity={0.7}
+        >
+          <FontAwesomeIcon icon={faEllipsisV} size={22} color="black" />
+        </TouchableOpacity>
+      }
+      contentStyle={styles.menuContent}
+      style={{ marginTop: 40 }}
+    >
+      <Menu.Item
+        onPress={toggleMenu}
+        title="Option One"
+        titleStyle={styles.menuItemText}
+        style={{ backgroundColor: 'grey' }}
+      />
+      <Divider style={styles.menuDivider} />
+      {['Option Two', 'Option Three', 'Option Four', 'Option Five'].map((item) => (
+        <View key={item}>
+          <Menu.Item
+            onPress={toggleMenu}
+            title={item}
+            titleStyle={styles.menuItemText}
+            style={styles.menuItem}
+          />
+          <Divider style={styles.menuDivider} />
+        </View>
+      ))}
+    </Menu>
+  </View>
+));
+
+function HomeScreen({ navigation }) {
+  const { 
+    socketConnect, 
+    socketClose, 
+    user, 
+    requestList, 
+    authenticated, 
+    socket 
+  } = useGlobal();
+  
+  const [menuVisible, setMenuVisible] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(ANIMATION_CONFIG.initialScale)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const openMenu = () => setVisible(true);
-  const closeMenu = () => setVisible(false);
+  const tabBarAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          damping: 20,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.ease,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 150,
+    if (!authenticated) return;
+    
+    let mounted = true;
+    const unsubscribe = NetInfo.addEventListener(({ isConnected }) => {
+      if (!mounted) return;
+      if (isConnected && !socket) socketConnect();
+      else if (!isConnected && socket) socketClose();
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [authenticated, socket]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: menuVisible ? 1 : ANIMATION_CONFIG.initialScale,
+        damping: ANIMATION_CONFIG.springDamping,
         useNativeDriver: true,
-      }).start(() => scaleAnim.setValue(0));
-    }
-  }, [visible]);
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: menuVisible ? 1 : 0,
+        duration: ANIMATION_CONFIG.duration,
+        easing: Easing.ease,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [menuVisible]);
 
   useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: false,
-    });
-  }, []);
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
 
-  useEffect(() => {
-    socketConnect();
-    return () => {
-      socketClose();
-    };
-  }, []);
-
-  function onSearch() {
-    navigation.navigate('Search');
-  }
-  function onRequest() {
-    navigation.navigate('Request');
-  }
+  const handleSearch = () => navigation.navigate('Search');
+  const handleRequest = () => navigation.navigate('Request');
+  const toggleMenu = () => setMenuVisible(prev => !prev);
 
   return (
-    <Tab.Navigator
-      screenOptions={({route, navigation}) => ({
-        tabBarHideOnKeyboard: true,
-        headerRight: () => (
-          <View style={{justifyContent: 'space-evenly', flexDirection: 'row'}}>
-            <TouchableOpacity onPress={onRequest}>
-              <FontAwesomeIcon
-                style={{marginRight: 16}}
-                icon="bell"
-                size={22}
-                color="white"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onSearch}>
-              <FontAwesomeIcon
-                style={{marginRight: 16}}
-                icon="magnifying-glass"
-                size={22}
-                color="white"
-              />
-            </TouchableOpacity>
-
-            <Menu
-              visible={visible}
-              onDismiss={closeMenu}
-              anchor={
-                <TouchableOpacity
-                  onPress={openMenu}
-                  style={{paddingVertical: 0}}>
-                  <FontAwesomeIcon icon="ellipsis-v" size={22} color="white" />
-                </TouchableOpacity>
-              }
-              contentStyle={[
-                {
-                  transform: [{scale: scaleAnim}],
-                  opacity: opacityAnim,
-                  marginTop: -10,
-                  backgroundColor: '#2a1a1c',
-                  borderRadius: 8,
-                },
-              ]}
-              style={{marginTop: 40}}>
-              <Animated.View>
-                <Menu.Item
-                  onPress={() => {
-                    closeMenu();
-                    // openPlayer({roomType: 'PlayMusic'});
-                  }}
-                  title="Option One"
-                  titleStyle={{color: 'white'}}
-                  style={{backgroundColor: '#2a1a1c'}}
-                />
-                <Divider style={{backgroundColor: '#413033'}} />
-                <Menu.Item
-                  onPress={() => {
-                    closeMenu();
-                    // openPlayer({roomType: 'PlayVideo'});
-                  }}
-                  title="Option Two"
-                  titleStyle={{color: 'white'}}
-                  style={{backgroundColor: '#2a1a1c'}}
-                />
-                <Divider style={{backgroundColor: '#413033'}} />
-                <Menu.Item
-                  onPress={() => {
-                    closeMenu();
-                    // openPlayer({roomType: 'PlayVideo'});
-                  }}
-                  title="Option Three"
-                  titleStyle={{color: 'white'}}
-                  style={{backgroundColor: '#2a1a1c'}}
-                />
-<Divider style={{backgroundColor: '#413033'}} />
-                <Menu.Item
-                  onPress={() => {
-                    closeMenu();
-                    // openPlayer({roomType: 'PlayVideo'});
-                  }}
-                  title="Option Four"
-                  titleStyle={{color: 'white'}}
-                  style={{backgroundColor: '#2a1a1c'}}
-                />
-<Divider style={{backgroundColor: '#413033'}} />
-                <Menu.Item
-                  onPress={() => {
-                    closeMenu();
-                    // openPlayer({roomType: 'PlayVideo'});
-                  }}
-                  title="Option Five"
-                  titleStyle={{color: 'white'}}
-                  style={{backgroundColor: '#2a1a1c'}}
+    <SafeAreaView style={styles.container}>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarHideOnKeyboard: true,
+          headerRight: () => (
+            <HeaderRight
+              onRequest={handleRequest}
+              onSearch={handleSearch}
+              requestList={requestList}
+              menuVisible={menuVisible}
+              toggleMenu={toggleMenu}
+            />
+          ),
+          tabBarIcon: ({ focused }) => {
+            const icons = {
+              Kari: faCar,
+              Chats: faMessage,
+              Profile: faUser,
+              updates: faClapperboard,
+              DocotAi: faUserDoctor,
+            };
+            return (
+              <Animated.View style={[styles.tabIcon, {
+                transform: [{ scale: focused ? 1.1 : 1 }],
+              }]}>
+                <FontAwesomeIcon 
+                  icon={icons[route.name]} 
+                  size={19} 
+                  color="black"
                 />
               </Animated.View>
-            </Menu>
-          </View>
-        ),
-        tabBarIcon: ({focused, color, size}) => {
-          const icons = {
-            Kari: 'car',
-            Chats: 'message',
-            Profile: 'user',
-            Reels: faClapperboard,
-            DocotAi: 'user-doctor',
-          };
-          const icon = icons[route.name];
-          return <FontAwesomeIcon icon={icon} size={19} color="white" />;
-        },
-        tabBarStyle:
-          route.name === 'DocotAi'
-            ? {display: 'none'}
-            : {
-                height: 65,
-                backgroundColor: '#0f0607',
-                borderTopWidth: 0,
-                elevation: 0,
-                shadowOpacity: 0,
-                marginTop: 10,
-              },
-        tabBarActiveBackgroundColor: '#0f0607',
-        tabBarInactiveBackgroundColor: '#0f0607',
-        tabBarActiveTintColor: 'red',
-        tabBarShowLabel: true,
-        tabBarLabelStyle: {
-          fontWeight: 'bold',
-          fontSize: 14,
-          marginBottom: 15,
-          marginTop: 0,
-        },
-      })}>
-      <Tab.Screen
-        name="Chats"
-        component={FriendsScreen}
-        options={{
-          headerTitle: 'KinakaAse',
-          headerTitleStyle: style.kinakaseText,
-          headerStyle: {
-            backgroundColor: '#0f0607',
-            height: 55,
-            elevation: 1,
+            );
           },
-        }}
-      />
-
-      <Tab.Screen
-        name="Reels"
-        component={ReelScreen}
-        options={{
-          headerShown: false,
-          headerStyle: {
-            backgroundColor: '#0f0607',
-            height: 80,
-            elevation: 1,
-          },
-        }}
-      />
-
-      <Tab.Screen
-        name="DocotAi"
-        component={DoctoAi}
-        options={({navigation}) => ({
-          headerShown: false,
-          headerTitle: 'Docto AI',
-          headerTitleStyle: {
-            color: 'white',
-            fontSize: 20,
-          },
-          headerStyle: {
-            backgroundColor: '#0f0607',
-            elevation: 0,
-            shadowOpacity: 0,
-          },
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Chats')}
-              style={{marginLeft: 16}}>
-              <FontAwesomeIcon icon="arrow-left" size={22} color="white" />
-            </TouchableOpacity>
-          ),
+          tabBarStyle: [
+            route.name === 'DocotAi' 
+              ? { display: 'none' }
+              : styles.tabBar,
+            { transform: [{ scaleY: tabBarAnim }] },
+          ],
+          tabBarActiveBackgroundColor: 'rgba(255, 253, 231, 1)',
+          tabBarInactiveBackgroundColor: 'rgba(255, 253, 231, 1)',
+          tabBarActiveTintColor: 'red',
+          tabBarInactiveTintColor: 'black',
+          tabBarLabelStyle: styles.tabLabel,
         })}
-      />
-
-      <Tab.Screen
-        name="Kari"
-        component={KariScreen}
-        options={{
-          headerShown: false,
-          headerStyle: {
-            backgroundColor: '#0f0607',
-            height: 80,
-            elevation: 1,
-          },
-        }}
-      />
-
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          headerShown: false,
-          headerStyle: {
-            backgroundColor: '#0f0607',
-            height: 80,
-            elevation: 1,
-          },
-        }}
-      />
-    </Tab.Navigator>
+        sceneContainerStyle={styles.sceneContainer}
+      >
+        <Tab.Screen
+          name="Chats"
+          component={FriendsScreen}
+          options={{
+            headerTitle: 'KinakaAse',
+            headerTitleStyle: styles.headerTitle,
+            headerStyle: styles.header,
+          }}
+        />
+        {/* <Tab.Screen
+          name="updates"
+          component={UpdateScreen}
+          options={{ headerShown: false }}
+        /> */}
+        <Tab.Screen
+          name="DocotAi"
+          component={DoctoAi}
+          options={{
+            headerShown: false,
+            headerTitle: 'Docto AI',
+            headerTitleStyle: styles.doctorHeaderTitle,
+            headerStyle: styles.doctorHeader,
+            headerLeft: () => (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Chats')}
+                style={styles.headerLeft}
+                activeOpacity={0.7}
+              >
+                <FontAwesomeIcon icon={faArrowLeft} size={22} color="white" />
+              </TouchableOpacity>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Kari"
+          component={KariScreen}
+          options={{ headerShown: false }}
+        />
+        <Tab.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ headerShown: false }}
+        />
+      </Tab.Navigator>
+    </SafeAreaView>
   );
 }
 
-const style = StyleSheet.create({
-  kinakaseText: {
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 253, 231, 1)',
+  },
+  sceneContainer: {
+    backgroundColor: 'rgba(255, 253, 231, 1)',
+  },
+  header: {
+    backgroundColor: 'rgba(255, 253, 231, 1)',
+    height: 55,
+    elevation: 1,
+    shadowOpacity: 0,
+  },
+  headerTitle: {
     fontSize: 25,
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 10,
+    justifyContent: 'space-evenly',
+  },
+  headerIcon: {
+    padding: 10,
+    marginRight: 6,
+  },
+  badge: {
+    position: 'absolute',
+    right: -5,
+    top: -5,
+    backgroundColor: 'red',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  menuContent: {
+    backgroundColor: 'grey',
+    borderRadius: 8,
+    transform: [{ scale: ANIMATION_CONFIG.initialScale }],
+    marginTop: -10,
+  },
+  menuItem: {
+    backgroundColor: 'grey',
+    minWidth: 150,
+  },
+  menuItemText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  menuDivider: {
+    backgroundColor: '#413033',
+  },
+  tabBar: {
+    height: 65,
+    backgroundColor: '#0f0607',
+    borderTopWidth: 0,
+    elevation: 0,
+    shadowOpacity: 0,
+    marginTop: 10,
+    paddingBottom: 5,
+  },
+  tabIcon: {
+    padding: 4,
+  },
+  tabLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  doctorHeader: {
+    backgroundColor: '#0f0607',
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  doctorHeaderTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: '500',
+  },
+  headerLeft: {
+    padding: 10,
+    marginLeft: 6,
   },
 });
 
-export default HomeScreen;
+export default memo(HomeScreen);

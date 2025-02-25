@@ -50,7 +50,7 @@ function RequestRow({ item }) {
 				<Text
 					style={{
 						fontWeight: 'bold',
-						color: '#202020',
+						color: 'black',
 						marginBottom: 4
 					}}
 				>
@@ -62,7 +62,7 @@ function RequestRow({ item }) {
 					}}
 				>
 					{message} <Text style={{ color: '#909090', fontSize: 13 }}>
-						{utils.formatTime(item.created)}
+						         {utils.formatTime(item.created)}
 					</Text>
 				</Text>
 			</View>
