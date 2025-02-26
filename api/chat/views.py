@@ -548,11 +548,17 @@ class CommentCreateView(generics.CreateAPIView):
         )
         logger.info(f"Comment {comment.id} created on post {post_id} by {'Anonymous' if not user else user.username}")
 
+from django.db.models import Q
+
 class MarkMessagesSeenView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, connection_id):
-        messages = Message.objects.filter(connection_id=connection_id, seen=False)
+        messages = Message.objects.filter(
+            ~Q(user=request.user),
+            connection_id=connection_id,
+            seen=False
+        )
         count = messages.update(seen=True, seen_at=timezone.now())
         logger.info(f"{count} messages marked as seen for connection {connection_id} by {request.user.username}")
         channel_layer = get_channel_layer()
@@ -567,6 +573,7 @@ class MarkMessagesSeenView(APIView):
             }
         )
         return Response({"marked_count": count}, status=status.HTTP_200_OK)
+     
 
 class UserProfileUpdateView(APIView):
     permission_classes = [IsAuthenticated]
