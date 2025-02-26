@@ -30,7 +30,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 AUTH_USER_MODEL = 'chat.User'
-
+SITE_DOMAIN=""
 # Set GOOGLE_APPLICATION_CREDENTIALS to the service-account.json file in the same folder
 BASE_DIRT = Path(__file__).resolve().parent
 GOOGLE_APPLICATION_CREDENTIALS = os.path.join(BASE_DIRT, 'service-account.json')

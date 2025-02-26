@@ -106,10 +106,17 @@ class FriendSerializer(serializers.ModelSerializer):
         return UserSerializer(obj.receiver if user == obj.sender else obj.sender).data
 
     def get_preview(self, obj):
-        return getattr(obj, 'latest_text', 'New connection') or 'New connection'
+        latest_message = Message.objects.filter(connection=obj, is_deleted=False).order_by('-created').first()
+        if latest_message:
+            if latest_message.type == 'text':
+                return latest_message.text
+            else:
+                return f"{latest_message.type.capitalize()} message"
+        return 'New connection'
 
     def get_updated(self, obj):
-        date = getattr(obj, 'latest_created', obj.updated) or obj.updated
+        latest_message = Message.objects.filter(connection=obj, is_deleted=False).order_by('-created').first()
+        date = latest_message.created if latest_message else obj.updated
         return date.isoformat()
 
     def get_unread_count(self, obj):

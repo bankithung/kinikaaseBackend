@@ -145,6 +145,8 @@ function FriendsScreen({navigation}) {
   const headerAnim = useRef(new Animated.Value(0)).current;
   const modalAnim = useRef(new Animated.Value(0)).current;
 
+
+
   // Animate search bar on mount
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -163,6 +165,18 @@ function FriendsScreen({navigation}) {
       useNativeDriver: true,
     }).start();
   }, [modalVisible]);
+
+  useEffect(() => {
+    console.log(
+      'FriendsScreen friendList updated:',
+      friendList?.map(f => ({
+        id: f.id,
+        username: f.friend.username,
+        preview: f.preview,
+        updated: f.updated,
+      })) || 'No friendList'
+    );
+  }, [friendList]);
 
   // Fetch friend list with block statuses
   // const fetchFriendListWithBlockStatus = async () => {

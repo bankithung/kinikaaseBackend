@@ -30,6 +30,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import messaging from '@react-native-firebase/messaging';
 import PushNotification from 'react-native-push-notification';
+import secure from './src/core/secure'; // Added for secure token storage (assumed module)
 
 // Lazy-loaded components
 const SplashScreen = lazy(() => import('./src/screens/Splash'));
@@ -232,18 +233,35 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Request FCM permission
         const authStatus = await messaging().requestPermission();
-        const enabled = authStatus === messaging.AuthorizationStatus.AUTHORIZED || authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-        if (enabled) {
-          utils.log('FCM permissions granted');
-          // Delay FCM token update until after init completes authentication
+        const enabled = authStatus === messaging.AuthorizationStatus.AUTHORIZED || 
+                       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        
+        if (!enabled) {
+          addNotification('FCM permissions not granted', 'error');
+          setIsLoading(false);
+          return;
         }
-        await init(); // This will handle authentication and FCM update if needed
 
-        // Set up foreground message handler after init
-        messaging().onMessage(async (remoteMessage) => {
-          addNotification(`New message: ${remoteMessage.notification?.body}`, 'success');
-          Vibration.vibrate([200, 100, 200]);
+        // Initialize app state
+        await init();
+
+        // Get and update FCM token
+        const tokens = await secure.get('tokens');
+        const fcmToken = await messaging().getToken();
+        if (fcmToken && tokens?.access) {
+          await api({
+            method: 'POST',
+            url: '/chat/update-fcm-token/',
+            data: { fcm_token: fcmToken },
+            headers: { Authorization: `Bearer ${tokens.access}` },
+          });
+          console.log('FCM token updated:', fcmToken);
+        }
+
+        // Handle foreground notifications
+        messaging().onMessage(async remoteMessage => {
           PushNotification.localNotification({
             channelId: 'default-channel',
             title: remoteMessage.notification?.title || 'New Message',
@@ -251,10 +269,26 @@ const App = () => {
             vibrate: true,
             vibration: 300,
             playSound: true,
+            data: remoteMessage.data,
           });
+          Vibration.vibrate(200);
+        });
+
+        // Handle token refresh
+        messaging().onTokenRefresh(async newToken => {
+          const refreshedTokens = await secure.get('tokens');
+          if (refreshedTokens?.access) {
+            await api({
+              method: 'POST',
+              url: '/chat/update-fcm-token/',
+              data: { fcm_token: newToken },
+              headers: { Authorization: `Bearer ${refreshedTokens.access}` },
+            });
+            console.log('FCM token refreshed:', newToken);
+          }
         });
       } catch (error) {
-        utils.log('Initialization error:', error);
+        console.error('Initialization error:', error);
         addNotification('Failed to initialize app', 'error');
       } finally {
         setIsLoading(false);
@@ -262,21 +296,39 @@ const App = () => {
     };
 
     initializeApp();
-
-    return () => messaging().onMessage(() => {});
   }, [init, addNotification]);
 
   useEffect(() => {
-    messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-      PushNotification.localNotification({
-        channelId: 'default-channel',
-        title: remoteMessage.notification?.title || 'New Message',
-        message: remoteMessage.notification?.body || 'Check your app!',
-        vibrate: true,
-        vibration: 300,
-        playSound: true,
-      });
+    PushNotification.configure({
+      onNotification: (notification) => {
+        console.log('Notification received:', notification);
+        Vibration.vibrate(200);
+        if (notification.data?.click_action === 'OPEN_CHAT') {
+          // Navigate to chat screen if needed
+          // Example: navigation.navigate('Messages', { connectionId: notification.data.connectionId });
+        }
+      },
+      requestPermissions: Platform.OS === 'ios',
+      popInitialNotification: true,
+      permissions: {
+        alert: true,
+        badge: true,
+        sound: true,
+      },
     });
+
+    if (Platform.OS === 'android') {
+      PushNotification.createChannel(
+        {
+          channelId: 'default-channel',
+          channelName: 'Default Channel',
+          importance: 4,
+          vibrate: true,
+          soundName: 'default',
+        },
+        (created) => console.log(`Channel created: ${created}`),
+      );
+    }
   }, []);
 
   const FallbackComponent = () => (

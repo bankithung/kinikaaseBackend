@@ -132,7 +132,7 @@ async function responseMessageList(set, get, data) {
 
 async function responseMessageSend(set, get, data) {
   const username = data.friend.username;
-  const connectionId = getConnectionId(get, username);
+  const connectionId = data.connectionId;
   if (!connectionId) return;
 
   const newMessage = data.message;
@@ -169,7 +169,7 @@ async function responseMessageSend(set, get, data) {
   });
 
 
-
+  console.log(`Updated friendList for connectionId ${connectionId} with preview: ${newMessage.text}`);
   const storedMessages = await getStoredMessages(connectionId);
   
   // const updatedMessages = mergeMessages(storedMessages, [newMessage]);
@@ -425,22 +425,12 @@ const useGlobal = create((set, get) => ({
     messaging().onTokenRefresh(async newToken => {
       const tokens = await secure.get('tokens');
       if (tokens?.access) {
-        try {
-          await api({
-            method: 'POST',
-            url: '/chat/update-fcm-token/',
-            data: {fcm_token: newToken},
-            headers: {Authorization: `Bearer ${tokens.access}`},
-          });
-          utils.log('Token refreshed:', newToken);
-        } catch (error) {
-          utils.log(
-            'FCM Token refresh failed:',
-            error.response?.data || error.message,
-          );
-        }
-      } else {
-        utils.log('No tokens available for FCM refresh');
+        await api({
+          method: 'POST',
+          url: '/chat/update-fcm-token/',
+          data: { fcm_token: newToken },
+          headers: { Authorization: `Bearer ${tokens.access}` },
+        });
       }
     });
 
@@ -815,7 +805,7 @@ const useGlobal = create((set, get) => ({
           });
       }
       
-          else if (parsed.source === 'message.delete') {
+          if (parsed.source === 'message.delete') {
             const { messageId, connectionId } = parsed.data;
             if (!connectionId) {
               console.error('connectionId missing in message.delete event');

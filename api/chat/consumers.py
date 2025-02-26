@@ -22,12 +22,14 @@ from .views import send_fcm_notification
 
 # Helper function to convert datetime objects to strings
 def serialize_datetime(obj):
-    if isinstance(obj, datetime):
+    if isinstance(obj, datetime.datetime):
         return obj.isoformat()
     elif isinstance(obj, dict):
         return {k: serialize_datetime(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [serialize_datetime(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        return serialize_datetime(obj.__dict__)
     return obj
 
 # Set up logging
@@ -241,6 +243,14 @@ class ChatConsumer(WebsocketConsumer):
         self.broadcast_online_status(user.username, True)
         self.send_initial_friend_status(user)
         self.accept()
+    
+    def get_preview_text(self, message):
+        if message.is_deleted:
+            return "Message deleted"
+        elif message.type == 'text':
+            return message.text
+        else:
+            return f"{message.type.capitalize()} message"
 
     def disconnect(self, close_code):
         if hasattr(self, 'username'):
@@ -281,6 +291,41 @@ class ChatConsumer(WebsocketConsumer):
                     'message': {'source': 'online.status', 'data': {'username': username, 'online': online}}
                 }
             )
+    def receive_message_delete(self, data):
+        user = self.scope['user']
+        message_id = data.get('messageId')
+        message = Message.objects.get(id=message_id, user=user)
+        message.is_deleted = True
+        message.save()
+
+        if message.connection:
+            recipient = message.connection.sender if message.connection.sender != user else message.connection.receiver
+            recipients = [user, recipient]
+            connection_id = str(message.connection.id)
+            latest_message = Message.objects.filter(connection=message.connection, is_deleted=False).order_by('-created').first()
+            new_preview = self.get_preview_text(latest_message) if latest_message else 'No messages'
+            new_updated = latest_message.created.isoformat() if latest_message else message.connection.updated.isoformat()
+        elif message.group:
+            recipients = message.group.members.all()
+            connection_id = f'group_{message.group.id}'
+            latest_message = Message.objects.filter(group=message.group, is_deleted=False).order_by('-created').first()
+            new_preview = self.get_preview_text(latest_message) if latest_message else 'No messages'
+            new_updated = latest_message.created.isoformat() if latest_message else message.group.created.isoformat()
+        else:
+            recipients = []
+            connection_id = None
+
+        # Update friend preview and broadcast deletion
+        for recipient in recipients:
+            self.send_group(recipient.username, 'friend.preview.update', {
+                'connectionId': connection_id,
+                'preview': new_preview,
+                'updated': new_updated
+            })
+            self.send_group(recipient.username, 'message.delete', {
+                'messageId': message.id,
+                'connectionId': connection_id
+            })
 
     def receive(self, text_data):
         try:
@@ -319,6 +364,7 @@ class ChatConsumer(WebsocketConsumer):
             logger.error(f"Error in receive: {e}")
             self.send_error("Server error")
 
+    # Update the receive_message_edit method in ChatConsumer
     def receive_message_edit(self, data):
         user = self.scope['user']
         message_id = data.get('messageId')
@@ -328,73 +374,86 @@ class ChatConsumer(WebsocketConsumer):
         message.save()
         serialized_message = MessageSerializer(message, context={'user': user}).data
 
-        if message.connection:
-            recipient = message.connection.sender if message.connection.sender != user else message.connection.receiver
-            recipients = [user, recipient]
-            connection_id = str(message.connection.id)
-            latest_message = Message.objects.filter(connection=message.connection, is_deleted=False).order_by('-created').first()
-        elif message.group:
-            recipients = message.group.members.all()
-            connection_id = f'group_{message.group.id}'
-            latest_message = Message.objects.filter(group=message.group, is_deleted=False).order_by('-created').first()
-        else:
-            recipients = []
-            connection_id = None
+        connection_id = None
+        recipients = []
+        new_preview = None
+        new_updated = None
 
-        # Send friend.preview.update if the edited message is the latest
+        if message.connection:
+            connection = message.connection
+            connection_id = str(connection.id)
+            recipient = connection.sender if connection.sender != user else connection.receiver
+            recipients = [user, recipient]
+            latest_message = Message.objects.filter(connection=connection, is_deleted=False).order_by('-created').first()
+        elif message.group:
+            group = message.group
+            connection_id = f'group_{group.id}'
+            recipients = group.members.all()
+            latest_message = Message.objects.filter(group=group, is_deleted=False).order_by('-created').first()
+        else:
+            return
+
+        # Update preview if edited message is the latest
         if latest_message and latest_message.id == message.id:
-            new_preview = new_text
+            new_preview = self.get_preview_text(message)
             new_updated = message.created.isoformat()
-            logger.info(f"Sending friend.preview.update - connectionId: {connection_id}, preview: {new_preview}, messageId: {message.id}")
+            
+            # Send friend.preview.update to all participants
             for recipient in recipients:
                 self.send_group(recipient.username, 'friend.preview.update', {
                     'connectionId': connection_id,
                     'preview': new_preview,
                     'updated': new_updated,
-                    'messageId': message.id
+                    'messageId': message.id  # Include message ID for validation
                 })
 
         # Always send message.update
         for recipient in recipients:
-            self.send_group(recipient.username, 'message.update', {'message': serialized_message})
-                
-
-    def receive_message_delete(self, data):
-        user = self.scope['user']
-        message_id = data.get('messageId')
-        message = Message.objects.get(id=message_id, user=user)
-        message.is_deleted = True
-        message.save()
-
-        if message.connection:
-            recipient = message.connection.sender if message.connection.sender != user else message.connection.receiver
-            recipients = [user, recipient]
-            connection_id = str(message.connection.id)
-            latest_message = Message.objects.filter(connection=message.connection, is_deleted=False).order_by('-created').first()
-            new_preview = latest_message.text if latest_message else 'No messages'
-            new_updated = latest_message.created.isoformat() if latest_message else message.connection.updated.isoformat()
-        elif message.group:
-            recipients = message.group.members.all()
-            connection_id = f'group_{message.group.id}'
-            latest_message = Message.objects.filter(group=message.group, is_deleted=False).order_by('-created').first()
-            new_preview = latest_message.text if latest_message else 'No messages'
-            new_updated = latest_message.created.isoformat() if latest_message else message.group.created.isoformat()
-        else:
-            recipients = []
-            connection_id = None
-
-        # Update friend preview and broadcast deletion
-        for recipient in recipients:
-            self.send_group(recipient.username, 'friend.preview.update', {
-                'connectionId': connection_id,
-                'preview': new_preview,
-                'updated': new_updated
+            self.send_group(recipient.username, 'message.update', {
+                'message': serialized_message
             })
-            self.send_group(recipient.username, 'message.delete', {
-                'messageId': message.id,
-                'connectionId': connection_id
-            })
+                    
 
+    # def receive_message_edit(self, data):
+    #     user = self.scope['user']
+    #     message_id = data.get('messageId')
+    #     new_text = data.get('newText')
+    #     message = Message.objects.get(id=message_id, user=user)
+    #     message.text = new_text
+    #     message.save()
+    #     serialized_message = MessageSerializer(message, context={'user': user}).data
+
+    #     if message.connection:
+    #         recipient = message.connection.sender if message.connection.sender != user else message.connection.receiver
+    #         recipients = [user, recipient]
+    #         connection_id = str(message.connection.id)
+    #         latest_message = Message.objects.filter(connection=message.connection, is_deleted=False).order_by('-created').first()
+    #     elif message.group:
+    #         recipients = message.group.members.all()
+    #         connection_id = f'group_{message.group.id}'
+    #         latest_message = Message.objects.filter(group=message.group, is_deleted=False).order_by('-created').first()
+    #     else:
+    #         recipients = []
+    #         connection_id = None
+
+    #     # Send friend.preview.update if the edited message is the latest
+    #     if latest_message and latest_message.id == message.id:
+    #         print(f"Sending friend.preview.update: connectionId={connection_id}, preview={new_preview}, updated={new_updated}")
+
+    #         new_preview = self.get_preview_text(message)
+    #         new_updated = message.created.isoformat()
+    #         logger.info(f"Sending friend.preview.update - connectionId: {connection_id}, preview: {new_preview}, messageId: {message.id}")
+    #         for recipient in recipients:
+    #             self.send_group(recipient.username, 'friend.preview.update', {
+    #                 'connectionId': connection_id,
+    #                 'preview': new_preview,
+    #                 'updated': new_updated,
+    #             })
+
+    #     # Always send message.update
+    #     for recipient in recipients:
+    #         self.send_group(recipient.username, 'message.update', {'message': serialized_message})
+            
     def receive_call_reject(self, data):
         recipient_username = data.get('recipient')
         roomId = data.get('roomId')
@@ -421,85 +480,50 @@ class ChatConsumer(WebsocketConsumer):
 
 
     def receive_message_send(self, data):
+        
         user = self.scope['user']
-        connectionId = data.get('connectionId')
+        connection_id = data.get('connectionId')
         message_text = data.get('message')
         type_ = data.get('type', 'text')
         replied_to_id = data.get('replied_to')
         is_group = data.get('isGroup', False)
         incognito = data.get('incognito', False)
         disappearing = data.get('disappearing', None)
-        connectionId_str = str(connectionId)
 
-        # Handle media file if present
-        base64_media = data.get('base64')
-        filename = data.get('filename')
-        media_file = None
-        if base64_media and filename:
-            try:
-                media_file = ContentFile(base64.b64decode(base64_media), name=filename)
-            except Exception as e:
-                logger.error(f"Error decoding media file: {e}")
-                self.send_error("Invalid media file")
-                return
-
-        # Create the message
+        # Determine recipients and create message
         if is_group:
-            group_id = connectionId_str.replace('group_', '')
-            group = Group.objects.get(id=group_id)
+            group = Group.objects.get(id=connection_id.replace('group_', ''))
             message = Message.objects.create(
                 group=group, user=user, text=message_text, type=type_,
                 replied_to=Message.objects.get(id=replied_to_id) if replied_to_id else None,
-                incognito=incognito, disappearing=disappearing, media_file=media_file
+                incognito=incognito, disappearing=disappearing
             )
             recipients = group.members.exclude(username=user.username)
-            connection_id = connectionId_str
             friend_data = {'username': group.name}
             group_name = group.name
         else:
-            connection = Connection.objects.get(id=int(connectionId))
+            connection = Connection.objects.get(id=connection_id)
             recipient = connection.sender if connection.sender != user else connection.receiver
+            BlockedUser.objects.filter(user=user, blocked_user=recipient).exists()
             message = Message.objects.create(
                 connection=connection, user=user, text=message_text, type=type_,
                 replied_to=Message.objects.get(id=replied_to_id) if replied_to_id else None,
-                incognito=incognito, disappearing=disappearing, media_file=media_file
+                incognito=incognito, disappearing=disappearing
             )
             recipients = [recipient]
-            connection_id = connectionId_str
             friend_data = UserSerializer(recipient).data
             group_name = None
-
-        # Prepare common data
-        new_preview = message_text if type_ == 'text' else f"{type_.capitalize()} message"
-        new_updated = message.created.isoformat()
-        timestamp = timezone.now().strftime('%I:%M %p')  # e.g., "2:30 PM"
 
         # Prepare notification details
         sender_name = user.username
         notification_title = f"{sender_name} sent a {type_.capitalize()}"
         if is_group:
             notification_title = f"{sender_name} sent a {type_.capitalize()} in {group_name}"
-
-        # Customize notification body based on message type
-        if type_ == 'text':
-            notification_body = f"{message_text} | {timestamp}"
-        elif type_ in ['image', 'video', 'audio', 'document']:
-            content_preview = f"[{type_.capitalize()}]" if not message.media_file else f"[{type_.capitalize()}]"
-            notification_body = f"{content_preview} | {timestamp}"
-        elif type_ == 'location':
-            notification_body = f"Location shared | {timestamp}"
-        elif type_ == 'videocall':
-            notification_body = f"Tap to join | {timestamp}"
-        elif type_ == 'voicecall':
-            notification_body = f"Tap to join | {timestamp}"
-        elif type_ == 'listen':
-            notification_body = f"Join to listen together | {timestamp}"
-        elif type_ == 'watch':
-            notification_body = f"Join to watch together | {timestamp}"
-        else:
-            notification_body = f"{message_text} | {timestamp}"  # Fallback
-
-        # Custom payload with additional message details
+        
+        timestamp = timezone.now().strftime('%I:%M %p')
+        notification_body = self.get_notification_body(type_, message_text, timestamp)
+        
+        thumbnail_url = f"https://{settings.SITE_DOMAIN}{settings.MEDIA_URL}{user.thumbnail}" if user.thumbnail else ""
         custom_payload = {
             "message": {
                 "token": None,  # Will be set per recipient
@@ -508,67 +532,83 @@ class ChatConsumer(WebsocketConsumer):
                     "body": notification_body
                 },
                 "data": {
-                    "connectionId": connection_id,
+                    "connectionId": str(connection_id),
                     "messageId": str(message.id),
                     "sender": sender_name,
+                    "senderThumbnail": thumbnail_url,
                     "content": message_text,
                     "type": type_,
                     "timestamp": timestamp,
                     "isGroup": str(is_group),
                     "groupName": group_name if is_group else "",
-                    "click_action": "FLUTTER_NOTIFICATION_CLICK"
-                }
+                    "click_action": "OPEN_CHAT"
+                },
+                "android": {"priority": "high"},
+                "apns": {"headers": {"apns-priority": "10"}}
             }
         }
 
-        # Process all recipients
+        # Notify recipients
         for recipient in recipients:
-            # Update friend preview
-            self.send_group(recipient.username, 'friend.preview.update', {
-                'connectionId': connection_id,
-                'preview': new_preview,
-                'updated': new_updated
-            })
-
-            # Send WebSocket message
             serialized_message = MessageSerializer(message, context={'user': recipient}).data
             self.send_group(recipient.username, 'message.send', {
                 'message': serialized_message,
-                'friend': UserSerializer(user).data
+                'friend': UserSerializer(user).data,
+                'connectionId': connection_id
             })
-
-            # Send FCM notification if token exists
-            if recipient.fcm_token:
+            
+            # Check if recipient has an FCM token and is not blocked
+            if recipient.fcm_token and not BlockedUser.objects.filter(user=user, blocked_user=recipient).exists():
                 custom_payload["message"]["token"] = recipient.fcm_token
-                send_fcm_notification(
+                result = send_fcm_notification(
                     fcm_token=recipient.fcm_token,
                     title=notification_title,
                     body=notification_body,
                     custom_payload=custom_payload
                 )
-                logger.info(f"FCM notification sent to {recipient.username}: {notification_title} - {notification_body}")
-            else:
-                logger.warning(f"No FCM token for {recipient.username}, skipping notification")
+                if result:
+                    logger.info(f"Notification sent to {recipient.username}")
+                else:
+                    logger.error(f"Failed to send notification to {recipient.username}")
 
-        # Handle sender's updates
-        self.send_group(user.username, 'friend.preview.update', {
-            'connectionId': connection_id,
-            'preview': new_preview,
-            'updated': new_updated
-        })
+        # Notify sender
         serialized_message = MessageSerializer(message, context={'user': user}).data
         self.send_group(user.username, 'message.send', {
             'message': serialized_message,
-            'friend': friend_data
+            'friend': friend_data,
+            'connectionId': connection_id
         })
+
+    def get_notification_body(self, type_, message_text, timestamp):
+        """Generate notification body based on message type."""
+        if type_ == 'text':
+            return f"{message_text} | {timestamp}"
+        elif type_ in ['image', 'video', 'audio', 'document']:
+            return f"[{type_.capitalize()}] | {timestamp}"
+        elif type_ == 'location':
+            return f"Location shared | {timestamp}"
+        elif type_ in ['videocall', 'voicecall']:
+            return f"Tap to join | {timestamp}"
+        elif type_ in ['listen', 'watch']:
+            return f"Join to {type_} together | {timestamp}"
+        return f"{message_text} | {timestamp}"
+
+    def send_group(self, group, source, data):
+        async_to_sync(self.channel_layer.group_send)(
+            group, {'type': 'broadcast_group', 'message': {'source': source, 'data': data}}
+        )
+
+    def broadcast_group(self, event):
+        self.send(text_data=json.dumps(event['message']))
         
     def receive_friend_list(self, data):
         user = self.scope['user']
-        latest_message = Message.objects.filter(connection=OuterRef('id')).order_by('-created')[:1]
+        latest_message = Message.objects.filter(connection=OuterRef('id'), is_deleted=False).order_by('-created')[:1]
         connections = Connection.objects.filter(
             Q(sender=user) | Q(receiver=user), accepted=True
         ).annotate(
             latest_text=latest_message.values('text'),
+            latest_type=latest_message.values('type'),
             latest_created=latest_message.values('created')
         ).order_by(Coalesce('latest_created', 'updated').desc())
         groups = Group.objects.filter(members=user)
@@ -576,14 +616,21 @@ class ChatConsumer(WebsocketConsumer):
             {
                 'id': f'group_{group.id}',
                 'friend': {'username': group.name, 'name': group.name, 'thumbnail': None, 'online': True},
-                'preview': group.messages.order_by('-created').first().text if group.messages.exists() else 'Group created',
-                'updated': group.created,
+                'preview': self.get_group_preview(group),
+                'updated': group.created.isoformat(),  # Fixed here
                 'unread_count': group.messages.filter(seen=False).exclude(user=user).count()
             } for group in groups
         ]
         serialized = FriendSerializer(connections, context={'user': user}, many=True)
         friend_list = serialized.data + group_connections
         self.send_group(user.username, 'friend.list', friend_list)
+        
+        
+    def get_group_preview(self, group):
+        latest_message = group.messages.filter(is_deleted=False).order_by('-created').first()
+        if latest_message:
+            return self.get_preview_text(latest_message)
+        return 'Group created'
 
     def receive_message_list(self, data):
         user = self.scope['user']
@@ -745,6 +792,7 @@ class ChatConsumer(WebsocketConsumer):
         self.send_group(user.username, 'group.created', serialized.data)
 
 class FeedConsumer(AsyncWebsocketConsumer):
+    
     async def connect(self):
         await self.channel_layer.group_add("feed_updates", self.channel_name)
         await self.accept()

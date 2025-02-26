@@ -28,63 +28,83 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+# chat/views.py
+import logging
+import requests
+from google.oauth2 import service_account
+from google.auth.transport.requests import Request
+from django.conf import settings
+import json
+
+logger = logging.getLogger(__name__)
+
 def send_fcm_notification(fcm_token, title, body, custom_payload=None):
-        logger.debug("Entering send_fcm_notification")
-        project_id = "kinikaasenotification"
-        url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
-        logger.info(f"FCM endpoint: {url}")
+    """
+    Send an FCM notification to a specific device.
+    
+    Args:
+        fcm_token (str): The FCM token of the recipient device.
+        title (str): Notification title.
+        body (str): Notification body.
+        custom_payload (dict): Optional custom payload for the notification.
+    
+    Returns:
+        dict: FCM response or None if failed.
+    """
+    if not fcm_token:
+        logger.error("FCM token is missing")
+        return None
 
-        try:
-            logger.info(f"Loading credentials from: {settings.GOOGLE_APPLICATION_CREDENTIALS}")
-            credentials = service_account.Credentials.from_service_account_file(
-                settings.GOOGLE_APPLICATION_CREDENTIALS,
-                scopes=["https://www.googleapis.com/auth/firebase.messaging"]
-            )
-            logger.info("Credentials loaded successfully")
-            credentials.refresh(Request())
-            access_token = credentials.token
-            logger.info(f"Generated FCM access token: {access_token[:20]}... (truncated)")
-        except Exception as e:
-            logger.error(f"Failed to generate FCM access token: {str(e)}")
-            return None
+    project_id = "kinikaasenotification"
+    url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
 
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        }
-        payload = custom_payload or {
-            "message": {
-                "token": fcm_token,
-                "notification": {
-                    "title": title,
-                    "body": body
-                },
-                "data": {
-                    "click_action": "FLUTTER_NOTIFICATION_CLICK"
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            settings.GOOGLE_APPLICATION_CREDENTIALS,
+            scopes=["https://www.googleapis.com/auth/firebase.messaging"]
+        )
+        credentials.refresh(Request())
+        access_token = credentials.token
+    except Exception as e:
+        logger.error(f"Failed to generate FCM access token: {str(e)}")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    # Use custom payload if provided, otherwise create a default one
+    payload = custom_payload or {
+        "message": {
+            "token": fcm_token,
+            "notification": {
+                "title": title,
+                "body": body
+            },
+            "data": {
+                "click_action": "OPEN_CHAT"
+            },
+            "android": {
+                "priority": "high"
+            },
+            "apns": {
+                "headers": {
+                    "apns-priority": "10"
                 }
             }
         }
-        try:
-            payload_str = json.dumps(payload, indent=2)
-            logger.info(f"FCM request payload prepared: {payload_str}")
-        except Exception as e:
-            logger.error(f"Failed to serialize payload: {str(e)}")
-            return None
+    }
 
-        try:
-            logger.info("Sending FCM request...")
-            response = requests.post(url, headers=headers, json=payload, timeout=10)
-            logger.info(f"FCM request sent, status code: {response.status_code}")
-            response.raise_for_status()
-            logger.info(f"FCM response: {response.json()}")
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"FCM request failed: {str(e)}")
-            if e.response:
-                logger.error(f"FCM response text: {e.response.text}")
-            else:
-                logger.error("FCM response text: No response (possible network issue)")
-            return None
+    try:
+        logger.debug(f"Sending FCM notification to {fcm_token}: {json.dumps(payload, indent=2)}")
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info(f"FCM notification sent successfully: {response.json()}")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"FCM request failed: {str(e)} - Response: {e.response.text if e.response else 'No response'}")
+        return None
 
 def get_auth_for_user(user):
     """
@@ -103,13 +123,9 @@ class UpdateFCMTokenView(APIView):
         user = request.user
         fcm_token = request.data.get('fcm_token')
         if not fcm_token:
-            logger.warning(f"FCM token missing for user {user.username}")
             return Response({'error': 'FCM token is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
         user.fcm_token = fcm_token
         user.save()
-        logger.info(f"FCM token updated for {user.username}: {fcm_token}")
-
         return Response({'success': 'FCM token updated'}, status=status.HTTP_200_OK)
 
 class UploadBgThumbnailView(APIView):

@@ -25,7 +25,7 @@ import utils from './utils';
 
 export const ADDRESS = Platform.OS === 'ios'
   ? 'localhost:8000'
-  : '3b9e-103-55-63-46.ngrok-free.app';
+  : 'd9f2-103-55-63-46.ngrok-free.app';
 
 const api = async ({ method, url, data, headers = {} }) => {
   try {
