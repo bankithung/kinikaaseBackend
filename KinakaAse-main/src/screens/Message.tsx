@@ -397,9 +397,9 @@ const MessageBubbleMe = memo(
             {headers: {Authorization: `Bearer ${token}`}},
           );
           if (response.status === 201) {
-            const serverReactionId = response.data.id; // Assuming server returns the reaction ID
+            const serverReactionId = response.data.id;
             const newReaction = {
-              id: serverReactionId || `temp_${Date.now()}`, // Use server ID if available, else temporary
+              id: serverReactionId || `temp_${Date.now()}`,
               emoji,
               user: user.username,
               created: new Date().toISOString(),
@@ -536,16 +536,16 @@ const MessageBubbleMe = memo(
                   <Text style={styles.deletedText}>Message deleted</Text>
                 ) : (
                   <View style={styles.bubbleContent}>
-                    {text.replied_to && (
+                    {text.replied_to && text.replied_to_message && (
                       <TouchableOpacity
                         onPress={() => onReplyPress(text.replied_to)}>
                         <View style={styles.replyContainerMe}>
                           <Text style={styles.replyAuthorMe}>
-                            {text.replied_to_message?.is_me
+                            {text.replied_to_message.is_me
                               ? 'You'
-                              : friend.name}
+                              : text.replied_to_message.user || friend.name}
                           </Text>
-                          {text.replied_to_message?.type === 'text' ? (
+                          {text.replied_to_message.type === 'text' ? (
                             <Text style={styles.replyTextMe}>
                               {text.replied_to_message.text}
                             </Text>
@@ -553,12 +553,12 @@ const MessageBubbleMe = memo(
                             <View style={styles.replyImageContainerMe}>
                               <Image
                                 source={{
-                                  uri: `https://${API_BASE_URL}${text.replied_to_message?.text}`,
+                                  uri: `https://${API_BASE_URL}${text.replied_to_message.text}`,
                                 }}
                                 style={styles.replyImage}
                               />
                               <Text style={styles.replyTextMe}>
-                                {text.replied_to_message?.type}
+                                {text.replied_to_message.type}
                               </Text>
                             </View>
                           )}
@@ -734,18 +734,11 @@ const MessageBubbleMe = memo(
                 <Image source={ASSETS.reply} style={styles.optionIconMe} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => startEditing(text)}>
-              <Image source={ASSETS.edit} style={styles.optionIconMe} />
+                <Image source={ASSETS.edit} style={styles.optionIconMe} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowEmojiPicker(true)}>
-              <Image source={ASSETS.react} style={styles.optionIconMe} />
+                <Image source={ASSETS.react} style={styles.optionIconMe} />
               </TouchableOpacity>
-              {/* <TouchableOpacity
-                onPress={() => {
-                  onPinMessage(text.id);
-                  setSelectedMessageId(null);
-                }}>
-                <Image source={ASSETS.pin} style={styles.optionIconMe} />
-              </TouchableOpacity> */}
             </View>
           )}
         </View>
@@ -758,7 +751,6 @@ const MessageBubbleMe = memo(
     );
   },
 );
-
 const MessageBubbleFriend = memo(
   ({
     text,
@@ -823,9 +815,9 @@ const MessageBubbleFriend = memo(
             {headers: {Authorization: `Bearer ${token}`}},
           );
           if (response.status === 201) {
-            const serverReactionId = response.data.id; // Assuming server returns the reaction ID
+            const serverReactionId = response.data.id;
             const newReaction = {
-              id: serverReactionId || `temp_${Date.now()}`, // Use server ID if available, else temporary
+              id: serverReactionId || `temp_${Date.now()}`,
               emoji,
               user: user.username,
               created: new Date().toISOString(),
@@ -1029,16 +1021,16 @@ const MessageBubbleFriend = memo(
                     <Text style={styles.deletedText}>Message deleted</Text>
                   ) : (
                     <View style={styles.bubbleContent}>
-                      {text.replied_to && (
+                      {text.replied_to && text.replied_to_message && (
                         <TouchableOpacity
                           onPress={() => onReplyPress(text.replied_to)}>
                           <View style={styles.replyContainerFriend}>
                             <Text style={styles.replyAuthorFriend}>
-                              {text.replied_to_message?.is_me
+                              {text.replied_to_message.is_me
                                 ? 'You'
-                                : friend.name}
+                                : text.replied_to_message.user || friend.name}
                             </Text>
-                            {text.replied_to_message?.type === 'text' ? (
+                            {text.replied_to_message.type === 'text' ? (
                               <Text style={styles.replyTextFriend}>
                                 {text.replied_to_message.text}
                               </Text>
@@ -1222,15 +1214,8 @@ const MessageBubbleFriend = memo(
                   />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowEmojiPicker(true)}>
-                <Image source={ASSETS.react} style={styles.optionIconFriend} />
+                  <Image source={ASSETS.react} style={styles.optionIconFriend} />
                 </TouchableOpacity>
-                {/* <TouchableOpacity
-                  onPress={() => {
-                    onPinMessage(text.id);
-                    setSelectedMessageId(null);
-                  }}>
-                  <Image source={ASSETS.pin} style={styles.optionIconFriend} />
-                </TouchableOpacity> */}
               </View>
             )}
           </View>
@@ -2456,15 +2441,27 @@ const MessagesScreen = ({navigation, route}) => {
     const tempId = `temp_${Date.now()}_${Math.random()
       .toString(36)
       .substr(2, 9)}`;
+
+
+    const repliedToMessage = replyingTo ? messagesList.find(m => m.id === replyingTo.id) : null;
     const tempMessage = {
       id: tempId,
       text: cleaned,
       type: 'text',
       created: new Date().toISOString(),
       is_me: true,
+      user: user.username,
       seen: false,
       is_deleted: false,
       replied_to: replyingTo?.id || null,
+      replied_to_message: repliedToMessage ? {
+        id: repliedToMessage.id,
+        text: repliedToMessage.text,
+        type: repliedToMessage.type,
+        is_me: repliedToMessage.is_me,
+        user: repliedToMessage.user || (repliedToMessage.is_me ? user.username : friend.username),
+        created: repliedToMessage.created,
+      } : null,
       pinned: false,
       incognito: incognito,
       disappearing: disappearing,
