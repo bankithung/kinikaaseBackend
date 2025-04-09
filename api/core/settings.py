@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from datetime import timedelta
+import dj_database_url
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -73,7 +75,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [('127.0.0.1', 6379)]
+            'hosts': [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')]
         }
     }
 }
@@ -95,6 +97,7 @@ INSTALLED_APPS = [
     'chat',
     'rides',
     'rest_framework.authtoken',
+    'food',
 ]
 
 MIDDLEWARE = [
@@ -133,13 +136,21 @@ CORS_ALLOW_ALL_ORIGINS = True
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': "bujulo-v2",  # Replace with your environment variable or production value
-        'USER': "admin",     # Replace with your environment variable or production value
-        'PASSWORD': "nimda", # Replace with your environment variable or production value
-        'HOST': "localhost", # Replace with your environment variable or production value
-        'PORT': "5432",      # Replace with your environment variable or production value
+        'NAME': "bujulo-v2",
+        'USER': "admin",
+        'PASSWORD': "nimda",
+        'HOST': "localhost",
+        'PORT': "5432",
     }
 }
+
+# Use DATABASE_URL environment variable if provided (for Render.com)
+if 'DATABASE_URL' in os.environ:
+    DATABASES['default'] = dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -165,6 +176,10 @@ USE_TZ = True
 
 # Static files settings
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Create logs directory if it doesn't exist
+os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
