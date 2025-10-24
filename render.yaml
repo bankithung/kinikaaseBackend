@@ -4,8 +4,9 @@ services:
     name: kinikaase-backend
     env: python
     plan: free
-    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r api/requirements-deploy.txt && cd api && python manage.py collectstatic --noinput && python manage.py migrate
-    startCommand: cd api && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    pythonVersion: 3.12
+    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r api/requirements-python312.txt && cd api && python manage.py collectstatic --noinput --settings=core.production_settings && python manage.py migrate --settings=core.production_settings
+    startCommand: cd api && gunicorn core.wsgi_production:application --bind 0.0.0.0:$PORT
     envVars:
       - key: DEBUG
         value: False
@@ -25,6 +26,8 @@ services:
         value: /static/
       - key: GOOGLE_APPLICATION_CREDENTIALS
         value: /opt/render/project/src/api/core/service-account.json
+      - key: REDIS_URL
+        value: redis://localhost:6379
 
 databases:
   # PostgreSQL database
