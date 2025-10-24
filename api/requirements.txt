@@ -30,7 +30,7 @@ sqlparse==0.4.4
 Twisted==23.8.0
 txaio==23.1.1
 typing_extensions==4.7.1
-zope.interface==6.0
+zope.interface>=6.0
 
 # Build dependencies
 setuptools>=65.0.0
