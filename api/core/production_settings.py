@@ -95,3 +95,13 @@ if os.environ.get('REDIS_URL'):
             'LOCATION': os.environ.get('REDIS_URL'),
         }
     }
+    
+    # Update Channel Layers for Redis
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [os.environ.get('REDIS_URL', 'redis://localhost:6379')]
+            }
+        }
+    }
