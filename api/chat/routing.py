@@ -6,4 +6,6 @@ websocket_urlpatterns = [
     path('video/', consumers.SignalingConsumer.as_asgi()),
     path('music/', consumers.SignalingMusicConsumer.as_asgi()),
     re_path(r'ws/feed/$', consumers.FeedConsumer.as_asgi()),
+    path('voice/', consumers.SignalingVoiceConsumer.as_asgi()),
+
 ]

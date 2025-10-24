@@ -19,6 +19,7 @@ from .serializers import (
 )
 from datetime import datetime
 from .views import send_fcm_notification
+import redis
 
 # Helper function to convert datetime objects to strings
 def serialize_datetime(obj):
@@ -34,6 +35,74 @@ def serialize_datetime(obj):
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+class SignalingVoiceConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.group_name = None
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if self.group_name:
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            await self.remove_user_from_group(self.group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            type_ = data.get('type')
+            logger.info(f"Received message type: {type_}")
+            if type_ == 'JOIN':
+                self.group_name = data.get('payload')
+                await self.channel_layer.group_add(self.group_name, self.channel_name)
+                await self.add_user_to_group(self.group_name, self.channel_name)
+                other_user = await self.get_other_user(self.group_name)
+                if other_user:
+                    await self.send(json.dumps({"type": "OTHER_USER", "payload": other_user}))
+                    await self.channel_layer.send(other_user, {"type": "user_joined", "payload": self.channel_name})
+            elif type_ == 'OFFER':
+                await self.channel_layer.send(data['target'], {"type": "offer", "sdp": data['sdp']})
+            elif type_ == 'ANSWER':
+                await self.channel_layer.send(data['target'], {"type": "answer", "sdp": data['sdp']})
+            elif type_ == 'ICE_CANDIDATE':
+                await self.channel_layer.send(data['target'], {"type": "ice_candidate", "candidate": data['candidate']})
+        except json.JSONDecodeError:
+            logger.error("Failed to decode WebSocket message as JSON")
+        except Exception as e:
+            logger.error(f"Error in SignalingConsumer: {e}")
+
+    async def user_joined(self, event):
+        await self.send(json.dumps({"type": "USER_JOINED", "payload": event['payload']}))
+
+    async def offer(self, event):
+        await self.send(json.dumps({"type": "OFFER", "sdp": event['sdp']}))
+
+    async def answer(self, event):
+        await self.send(json.dumps({"type": "ANSWER", "sdp": event['sdp']}))
+
+    async def ice_candidate(self, event):
+        await self.send(json.dumps({"type": "ICE_CANDIDATE", "candidate": event['candidate']}))
+
+    @database_sync_to_async
+    def add_user_to_group(self, group_name, channel_name):
+        group_users = cache.get(group_name, [])
+        if channel_name not in group_users:
+            group_users.append(channel_name)
+            cache.set(group_name, group_users, timeout=86400)
+        logger.info(f"Added {channel_name} to group {group_name}")
+
+    @database_sync_to_async
+    def remove_user_from_group(self, group_name, channel_name):
+        group_users = cache.get(group_name, [])
+        if channel_name in group_users:
+            group_users.remove(channel_name)
+            cache.set(group_name, group_users, timeout=86400)
+        logger.info(f"Removed {channel_name} from group {group_name}")
+
+    @database_sync_to_async
+    def get_other_user(self, group_name):
+        users = cache.get(group_name, [])
+        return next((user for user in users if user != self.channel_name), None)
+    
 
 class SignalingMusicConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -244,6 +313,238 @@ class ChatConsumer(WebsocketConsumer):
         self.send_initial_friend_status(user)
         self.accept()
     
+    def receive_voicecall_request(self, data):
+        inner_data = data.get("data", {})
+        connection_id = inner_data.get("connectionId")
+        room_id = inner_data.get("roomId")
+
+        if not connection_id:
+            logger.error("No connection ID provided in receive_voicecall_request")
+            self.send_error("Connection ID is required")
+            return
+
+        if not room_id:
+            logger.error("No room ID provided in receive_voicecall_request")
+            self.send_error("Room ID is required")
+            return
+
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist")
+            self.send_error("Connection not found")
+            return
+
+        user = self.scope["user"]
+        recipient = connection.sender if connection.sender != user else connection.receiver
+        self.send_group(
+            recipient.username,
+            "voicecall.request",
+            {
+                "caller": user.username,
+                "roomId": room_id,
+                "connectionId": connection_id,
+            },
+        )
+        print(f"Voice call request from {user.username} to {recipient.username} for room {room_id}")
+
+    def receive_voicecall_accept(self, data):
+        inner_data = data.get("data", {})
+        connection_id = inner_data.get("connectionId")
+        room_id = inner_data.get("roomId")
+
+        if not connection_id:
+            logger.error("No connection ID provided in receive_voicecall_accept")
+            self.send_error("Connection ID is required")
+            return
+
+        if not room_id:
+            logger.error("No room ID provided in receive_voicecall_accept")
+            self.send_error("Room ID is required")
+            return
+
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist in receive_voicecall_accept")
+            self.send_error("Connection not found")
+            return
+
+        user = self.scope["user"]
+        caller = connection.sender if connection.receiver == user else connection.receiver
+        self.send_group(
+            caller.username,
+            "voicecall.accept",
+            {"roomId": room_id, "connectionId": connection_id},
+        )
+        logger.info(f"Voice call accepted by {user.username} from {caller.username} for room {room_id}")
+
+    def receive_voicecall_reject(self, data):
+        inner_data = data.get("data", {})
+        connection_id = inner_data.get("connectionId")
+
+        if not connection_id:
+            logger.error("No connection ID provided in receive_voicecall_reject")
+            self.send_error("Connection ID is required")
+            return
+
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist in receive_voicecall_reject")
+            self.send_error("Connection not found")
+            return
+
+        user = self.scope["user"]
+        caller = connection.sender if connection.receiver == user else connection.receiver
+        self.send_group(
+            caller.username,
+            "voicecall.reject",
+            {"connectionId": connection_id},
+        )
+        logger.info(f"Voice call rejected by {user.username} from {caller.username}")
+
+    def receive_voicecall_cancel(self, data):
+        inner_data = data.get("data", {})
+        connection_id = inner_data.get("connectionId")
+
+        if not connection_id:
+            logger.error("No connection ID provided in receive_voicecall_cancel")
+            self.send_error("Connection ID is required")
+            return
+
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist in receive_voicecall_cancel")
+            self.send_error("Connection not found")
+            return
+
+        user = self.scope["user"]
+        recipient = connection.sender if connection.sender != user else connection.receiver
+        self.send_group(
+            recipient.username,
+            "voicecall.cancel",
+            {"connectionId": connection_id},
+        )
+        logger.info(f"Voice call canceled by {user.username} to {recipient.username}")
+        
+    def receive_call_request(self, data):
+    # Access the nested 'data' dictionary, default to {} if missing
+        inner_data = data.get('data', {})
+        connection_id = inner_data.get('connectionId')
+        room_id = inner_data.get('roomId')
+        
+        # Validate that connection_id is provided
+        if connection_id is None:
+            logger.error("No connection ID provided in receive_call_request")
+            self.send_error('Connection ID is required')
+            return
+        
+        # Validate that room_id is provided
+        if not room_id:
+            logger.error("No room ID provided in receive_call_request")
+            self.send_error('Room ID is required')
+            return
+        
+        # Proceed with the logic (example implementation)
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist")
+            self.send_error('Connection not found')
+            return
+        
+        user = self.scope['user']
+        recipient = connection.sender if connection.sender != user else connection.receiver
+        self.send_group(recipient.username, 'call.request', {
+            'caller': user.username,
+            'roomId': room_id,
+            'connectionId': connection_id
+        })
+        logger.info(f"Call request from {user.username} to {recipient.username} for room {room_id}")
+        
+    def receive_call_accept(self, data):
+        inner_data = data.get('data', {})
+        connection_id = inner_data.get('connectionId')
+        room_id = inner_data.get('roomId')
+        
+        if not connection_id:
+            logger.error("No connection ID provided in receive_call_accept")
+            self.send_error('Connection ID is required')
+            return
+        
+        if not room_id:
+            logger.error("No room ID provided in receive_call_accept")
+            self.send_error('Room ID is required')
+            return
+        
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist in receive_call_accept")
+            self.send_error('Connection not found')
+            return
+        
+        user = self.scope['user']
+        caller = connection.sender if connection.receiver == user else connection.receiver
+        
+        # Notify caller that call is accepted
+        self.send_group(caller.username, 'call.accept', {
+            'roomId': room_id,
+            'connectionId': connection_id
+        })
+        logger.info(f"Call accepted by {user.username} from {caller.username} for room {room_id}")
+    
+    def receive_call_reject(self, data):
+        inner_data = data.get('data', {})
+        connection_id = inner_data.get('connectionId')
+        
+        if not connection_id:
+            logger.error("No connection ID provided in receive_call_reject")
+            self.send_error('Connection ID is required')
+            return
+        
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist in receive_call_reject")
+            self.send_error('Connection not found')
+            return
+        
+        user = self.scope['user']
+        caller = connection.sender if connection.receiver == user else connection.receiver
+        
+        # Notify caller that call is rejected
+        self.send_group(caller.username, 'call.reject', {
+            'connectionId': connection_id
+        })
+        logger.info(f"Call rejected by {user.username} from {caller.username}")
+    def receive_call_cancel(self, data):
+        inner_data = data.get('data', {})
+        connection_id = inner_data.get('connectionId')
+        
+        if not connection_id:
+            logger.error("No connection ID provided in receive_call_cancel")
+            self.send_error('Connection ID is required')
+            return
+        
+        try:
+            connection = Connection.objects.get(id=connection_id)
+        except Connection.DoesNotExist:
+            logger.error(f"Connection with ID {connection_id} does not exist in receive_call_cancel")
+            self.send_error('Connection not found')
+            return
+        
+        user = self.scope['user']
+        recipient = connection.sender if connection.sender != user else connection.receiver
+        
+        # Notify recipient that call is canceled
+        self.send_group(recipient.username, 'call.cancel', {
+            'connectionId': connection_id
+        })
+        logger.info(f"Call canceled by {user.username} to {recipient.username}")
+    
     def get_preview_text(self, message):
         if message.is_deleted:
             return "Message deleted"
@@ -349,6 +650,14 @@ class ChatConsumer(WebsocketConsumer):
                 'call.reject': self.receive_call_reject,
                 'message.edit': self.receive_message_edit,
                 'message.delete': self.receive_message_delete,
+                'call.request': self.receive_call_request,
+                'call.accept': self.receive_call_accept,
+                'call.reject': self.receive_call_reject,
+                'call.cancel': self.receive_call_cancel,
+                'voicecall.request': self.receive_voicecall_request,
+                'voicecall.accept': self.receive_voicecall_accept,
+                'voicecall.reject': self.receive_voicecall_reject,
+                'voicecall.cancel': self.receive_voicecall_cancel,
             }
 
             handler = handlers.get(data_source)
@@ -363,6 +672,8 @@ class ChatConsumer(WebsocketConsumer):
         except Exception as e:
             logger.error(f"Error in receive: {e}")
             self.send_error("Server error")
+            
+
 
     # Update the receive_message_edit method in ChatConsumer
     def receive_message_edit(self, data):
@@ -454,11 +765,11 @@ class ChatConsumer(WebsocketConsumer):
     #     for recipient in recipients:
     #         self.send_group(recipient.username, 'message.update', {'message': serialized_message})
             
-    def receive_call_reject(self, data):
-        recipient_username = data.get('recipient')
-        roomId = data.get('roomId')
-        self.send_group(recipient_username, 'call.rejected', {'roomId': roomId})
-        logger.info(f"Call rejection sent to {recipient_username} for room {roomId}")
+    # def receive_call_reject(self, data):
+    #     recipient_username = data.get('recipient')
+    #     roomId = data.get('roomId')
+    #     self.send_group(recipient_username, 'call.rejected', {'roomId': roomId})
+    #     logger.info(f"Call rejection sent to {recipient_username} for room {roomId}")
 
     def send_group(self, group, source, data):
         serialized_data = serialize_datetime(data)
@@ -480,7 +791,6 @@ class ChatConsumer(WebsocketConsumer):
 
 
     def receive_message_send(self, data):
-        
         user = self.scope['user']
         connection_id = data.get('connectionId')
         message_text = data.get('message')
@@ -502,7 +812,12 @@ class ChatConsumer(WebsocketConsumer):
             friend_data = {'username': group.name}
             group_name = group.name
         else:
-            connection = Connection.objects.get(id=connection_id)
+            try:
+                connection = Connection.objects.get(id=connection_id)
+            except Connection.DoesNotExist:
+                logger.error(f"Connection with ID {connection_id} does not exist in receive_message_send")
+                self.send_error('Connection not found')
+                return
             recipient = connection.sender if connection.sender != user else connection.receiver
             BlockedUser.objects.filter(user=user, blocked_user=recipient).exists()
             message = Message.objects.create(

@@ -1,60 +1,34 @@
 services:
-  # Web service
+  # Backend service
   - type: web
-    name: django-app
-    runtime: python
-    buildCommand: "cd api && ./build.sh"
-    startCommand: "cd api && ./render-setup.sh && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT"
+    name: kinikaase-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r api/requirements.txt && cd api && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: cd api && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: django-db
-          property: connectionString
+      - key: DEBUG
+        value: False
       - key: SECRET_KEY
         generateValue: true
-      - key: DEBUG
-        value: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kinikaase-db
+          property: connectionString
       - key: ALLOWED_HOSTS
-        value: ".onrender.com"
-      - key: SECURE_SSL_REDIRECT
-        value: true
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: django-redis
-          property: connectionString
+        value: kinikaase-backend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://kinikaase-backend.onrender.com,https://your-frontend-domain.com
+      - key: MEDIA_URL
+        value: /media/
+      - key: STATIC_URL
+        value: /static/
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /opt/render/project/src/api/core/service-account.json
 
-  # Worker service for Channels
-  - type: worker
-    name: django-worker
-    runtime: python
-    buildCommand: "cd api && ./build.sh"
-    startCommand: "cd api && python manage.py runworker channel_layer"
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: django-db
-          property: connectionString
-      - key: SECRET_KEY
-        generateValue: true
-      - key: DEBUG
-        value: false
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: django-redis
-          property: connectionString
-
-  # Redis service for channels
-  - type: redis
-    name: django-redis
-    plan: starter
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: Everywhere
-
-# Database service
 databases:
-  - name: django-db
-    plan: starter
-    databaseName: django_app_db 
+  # PostgreSQL database
+  - name: kinikaase-db
+    plan: free
+    databaseName: kinikaase_production
+    user: kinikaase_user
