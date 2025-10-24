@@ -16,7 +16,7 @@ hyperlink==21.0.0
 idna==3.4
 incremental==22.10.0
 msgpack==1.0.5
-Pillow==10.0.0
+Pillow==10.4.0
 pyasn1==0.5.0
 pyasn1-modules==0.3.0
 pycparser==2.21
@@ -31,6 +31,10 @@ Twisted==23.8.0
 txaio==23.1.1
 typing_extensions==4.7.1
 zope.interface==6.0
+
+# Build dependencies
+setuptools>=65.0.0
+wheel>=0.38.0
 
 # Production dependencies
 dj-database-url==2.1.0
